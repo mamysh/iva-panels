@@ -54,3 +54,5 @@ Dev.3 установлен штатным `iva plugin update iva-panels` из л
 ## Dev.4: оформление
 
 Rich-режим использует официальные [sendRichMessage](https://core.telegram.org/bots/api#sendrichmessage) и [editMessageText](https://core.telegram.org/bots/api#editmessagetext), block buttons и HTML escaping. Автоматический adapter/stock Bridge smoke проверяет один rich send и редактирование того же message ID при переходах и закрытии. Callback namespace, права и формат сохранённых экранов не менялись. Скриншот владельца подтвердил открытие фактической карточки настроек dev.3; он не подтверждает всю цепочку переходов/диагностики или редактирование настроек.
+
+Dev.4 установлен штатным update, `presentation=rich`, exact код `ec14fa59e956147fd14c7862b9aa0934d02f907d`, bundle SHA-256 `195d5b0af2071595ab894d71de33101cc60bb578f38ab3f0af0131c3008fe8fc`. CI прошёл: 41 Linux тест и оба stock Bridge jobs. Сервис и проксируемый Eve health отвечают; версия ядра и процесс Eve сохранились. Новые реальные rich send/edit и внешний вид клиентом владелец ещё не подтвердил.
