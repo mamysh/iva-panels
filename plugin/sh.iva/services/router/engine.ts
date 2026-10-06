@@ -34,8 +34,8 @@ export class Engine {
     this.delivery = delivery;
     this.now = now;
   }
-  handle(event: Event): Promise<void> {
-    const operation = this.tail.then(() => this.perform(event));
+  handle(event: Event, part?: number): Promise<void> {
+    const operation = this.tail.then(() => this.perform(event, part));
     this.tail = operation.catch(() => {});
     return operation;
   }
@@ -51,9 +51,8 @@ export class Engine {
     receipt.phase = "done";
     await this.store.save(state);
   }
-  private async perform(event: Event) {
+  private async perform(event: Event, part?: number) {
     const state = await this.store.load();
-    const key = String(event.update_id);
     const hash = createHash("sha256")
       .update(
         JSON.stringify([
@@ -64,10 +63,20 @@ export class Engine {
         ]),
       )
       .digest("hex");
-    const prior = state.events[key];
+    const key =
+      part === undefined
+        ? String(event.update_id)
+        : `${event.update_id}:${part}:${hash}`;
+    // Bridge may regroup an inbox after a failed acknowledgement. Message identity
+    // survives that regrouping even when the batch's maximum update ID changes.
+    const previousKey = state.events[key]
+      ? key
+      : Object.keys(state.events).find((k) => state.events[k].hash === hash);
+    const prior =
+      previousKey === undefined ? undefined : state.events[previousKey];
     if (prior) {
       if (prior.hash !== hash) throw new Error("EVENT_COLLISION");
-      if (prior.phase === "editing") await this.deliver(state, key);
+      if (prior.phase === "editing") await this.deliver(state, previousKey!);
       else if (prior.phase === "sending") {
         prior.phase = "uncertain";
         await this.store.save(state);
@@ -87,9 +96,9 @@ export class Engine {
     if (Object.keys(state.events).length >= LIMITS.events) {
       const done = Object.keys(state.events)
         .filter((k) => ["done", "uncertain"].includes(state.events[k].phase))
-        .sort((a, b) => Number(a) - Number(b))[0];
+        .sort((a, b) => Number.parseInt(a, 10) - Number.parseInt(b, 10))[0];
       if (!done) throw new Error("EVENT_CAPACITY");
-      state.floor = Math.max(state.floor, Number(done));
+      state.floor = Math.max(state.floor, Number.parseInt(done, 10));
       delete state.events[done];
       if (event.update_id <= state.floor) {
         await this.store.save(state);

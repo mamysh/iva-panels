@@ -10,6 +10,7 @@ import { once } from "node:events";
 async function fixture(
   t: { after(fn: () => Promise<unknown>): void },
   mode: number,
+  launcher = false,
 ) {
   const directory = await mkdtemp(join(tmpdir(), "panels-service-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
@@ -41,14 +42,22 @@ async function fixture(
     { mode },
   );
   const child = spawn(
-    process.execPath,
-    [resolve("plugin/sh.iva/services/router/server.mjs")],
+    launcher ? "bash" : process.execPath,
+    [
+      resolve(
+        launcher
+          ? "plugin/sh.iva/services/router/launch.sh"
+          : "plugin/sh.iva/services/router/server.mjs",
+      ),
+    ],
     {
+      cwd: launcher ? resolve("plugin/sh.iva/services/router") : process.cwd(),
       env: {
         ...process.env,
         PLUGIN_DATA: directory,
         IVA_DATA_DIR: directory,
         IVA_SERVICE_PORT: String(port),
+        PLUGIN_ROOT: resolve("plugin"),
       },
       stdio: ["ignore", "pipe", "pipe"],
     },
@@ -63,7 +72,7 @@ async function fixture(
       await exited;
     }
   });
-  return { child, exited, port, logs: () => logs };
+  return { child, exited, port, directory, logs: () => logs };
 }
 test(
   "standalone distribution starts with private config and transparently forwards",
@@ -103,5 +112,78 @@ test(
     assert.match(f.logs(), /startup failed/);
     assert(!f.logs().includes("synthetic-secret"));
     assert(!f.logs().includes("424242"));
+  },
+);
+
+test(
+  "Linux launcher refuses a concurrent instance and releases its lock after exit",
+  { skip: process.platform !== "linux", timeout: 10000 },
+  async (t) => {
+    const f = await fixture(t, 0o600, true);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        assert.equal(
+          (await fetch(`http://127.0.0.1:${f.port}/health`)).status,
+          200,
+        );
+        break;
+      } catch (error) {
+        if (attempt >= 50) throw error;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
+    const second = spawn(
+      "bash",
+      [resolve("plugin/sh.iva/services/router/launch.sh")],
+      {
+        cwd: resolve("plugin/sh.iva/services/router"),
+        env: {
+          ...process.env,
+          PLUGIN_ROOT: resolve("plugin"),
+          PLUGIN_DATA: f.directory,
+          IVA_DATA_DIR: f.directory,
+          IVA_SERVICE_PORT: String(f.port),
+        },
+        stdio: "ignore",
+      },
+    );
+    const [code] = await once(second, "exit");
+    assert.equal(code, 1);
+    f.child.kill("SIGTERM");
+    await f.exited;
+    const third = spawn(
+      "bash",
+      [resolve("plugin/sh.iva/services/router/launch.sh")],
+      {
+        cwd: resolve("plugin/sh.iva/services/router"),
+        env: {
+          ...process.env,
+          PLUGIN_ROOT: resolve("plugin"),
+          PLUGIN_DATA: f.directory,
+          IVA_DATA_DIR: f.directory,
+          IVA_SERVICE_PORT: String(f.port),
+        },
+        stdio: "ignore",
+      },
+    );
+    const done = once(third, "exit");
+    t.after(async () => {
+      if (third.exitCode === null && third.signalCode === null) {
+        third.kill("SIGTERM");
+        await done;
+      }
+    });
+    for (let attempt = 0; ; attempt++) {
+      try {
+        assert.equal(
+          (await fetch(`http://127.0.0.1:${f.port}/health`)).status,
+          200,
+        );
+        break;
+      } catch (error) {
+        if (attempt >= 50) throw error;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
   },
 );

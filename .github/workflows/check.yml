@@ -16,3 +16,29 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: bash -n plugin/sh.iva/services/router/launch.sh
+
+  bridge:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        core:
+          [
+            3ad563e42f4aec9d9b1cee8ab93026bf4c834288,
+            5cf8f1963c8297e244655fa4f3dc6f1764030283,
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          repository: smixs/iva-agent
+          ref: ${{ matrix.core }}
+          path: compat-core
+          persist-credentials: false
+      - run: npm ci
+        working-directory: compat-core
+      - run: node scripts/check-bridge.mjs compat-core

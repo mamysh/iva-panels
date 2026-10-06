@@ -192,3 +192,40 @@ test("config rejects remote, self-contained credentials and paths; mode defaults
     "passthrough",
   );
 });
+test("mixed Bridge batch forwards only ordinary parts and preserves queue receipt", async (t) => {
+  for (const reversed of [false, true]) {
+    const f = await setup(t);
+    const own = input().message;
+    const normal = input("ordinary").message;
+    normal.message_id = 20;
+    const message = {
+      ...(reversed ? normal : own),
+      iva_parts: reversed ? [normal, own] : [own, normal],
+      iva_durable_queue_receipt: "1234567890abcdef1234567890abcdef",
+    };
+    const result = await f.post({ update_id: 50, message });
+    assert.equal(result.status, 204);
+    assert.equal(f.handled(), 1);
+    const forwarded = JSON.parse(f.calls[0].body);
+    assert.equal(forwarded.message.text, "ordinary");
+    assert.equal(forwarded.message.message_id, 20);
+    assert.equal(forwarded.message.iva_parts, undefined);
+    assert.equal(
+      forwarded.message.iva_durable_queue_receipt,
+      message.iva_durable_queue_receipt,
+    );
+    assert.equal(forwarded.update_id, 50);
+  }
+});
+test("own-only batch dispatches each part and never reaches Eve", async (t) => {
+  const f = await setup(t);
+  const a = input().message,
+    b = { ...a, message_id: 20 };
+  const result = await f.post({
+    update_id: 55,
+    message: { ...a, iva_parts: [a, b] },
+  });
+  assert.equal(result.status, 204);
+  assert.equal(f.handled(), 2);
+  assert.equal(f.calls.length, 0);
+});

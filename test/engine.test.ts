@@ -268,3 +268,31 @@ test("property: button callback byte budget and literal HTML text", () => {
     { seed: 20261007, numRuns: 100 },
   );
 });
+test("regrouped command retains identity and distinct batch commands both open", async (t) => {
+  const f = await fixture(t);
+  await f.engine.handle(event(100, "/panels", 10), 0);
+  await f.fresh().handle(event(101, "/panels", 10), 1);
+  assert.equal(f.calls.length, 1);
+  await f.engine.handle(event(101, "/panels", 11), 2);
+  assert.equal(f.calls.length, 2);
+});
+test("regrouped pending edit retries saved delivery without rendering again", async (t) => {
+  const f = await fixture(t);
+  await f.engine.handle(event(100, "/panels", 10));
+  const choice =
+    f.calls[0].payload.reply_markup.inline_keyboard[0][0].callback_data;
+  f.editFailure(true);
+  await assert.rejects(f.engine.handle(event(101, choice, 100), 0));
+  const renders = f.renders();
+  f.editFailure(false);
+  await f.fresh().handle(event(102, choice, 100), 1);
+  assert.equal(f.renders(), renders);
+  assert.equal(f.calls.filter((c) => c.kind === "send").length, 1);
+});
+test("partial Bridge acknowledgement can shift a part index under the same batch ID", async (t) => {
+  const f = await fixture(t);
+  await f.engine.handle(event(100, "/panels", 10), 0);
+  await f.engine.handle(event(100, "/panels", 11), 1);
+  await f.fresh().handle(event(100, "/panels", 11), 0);
+  assert.equal(f.calls.filter((c) => c.kind === "send").length, 2);
+});

@@ -27,7 +27,7 @@ export const stateSchema = z
     schema: z.literal(1),
     floor: z.number().int().min(-1),
     screens: z.record(z.string().regex(/^[a-f0-9]{24}$/), screen),
-    events: z.record(z.string().regex(/^\d+$/), receipt),
+    events: z.record(z.string().regex(/^\d+(?::\d+:[a-f0-9]{64})?$/), receipt),
   })
   .strict();
 export type State = z.infer<typeof stateSchema>;

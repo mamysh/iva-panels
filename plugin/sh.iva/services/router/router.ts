@@ -56,7 +56,10 @@ function forward(
       port: address.port,
       method: req.method,
       path: req.url,
-      headers: filtered(req.headers),
+      headers: {
+        ...filtered(req.headers),
+        ...(body ? { "content-length": String(body.length) } : {}),
+      },
     },
     (result) => {
       res.writeHead(result.statusCode ?? 502, filtered(result.headers));
@@ -92,7 +95,7 @@ export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
       return;
     }
     try {
-      const parts: Buffer[] = [];
+      const chunks: Buffer[] = [];
       let size = 0;
       for await (const part of req) {
         const bytes = Buffer.from(part);
@@ -102,9 +105,9 @@ export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
           res.end();
           return;
         }
-        parts.push(bytes);
+        chunks.push(bytes);
       }
-      const body = Buffer.concat(parts);
+      const body = Buffer.concat(chunks);
       let input: unknown;
       try {
         input = JSON.parse(body.toString());
@@ -112,8 +115,21 @@ export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
         forward(req, res, config.upstream, body);
         return;
       }
-      const raw = input as { message?: { text?: unknown } } | null;
-      if (!owns(raw?.message?.text)) {
+      const raw = input as {
+        message?: {
+          text?: unknown;
+          iva_parts?: unknown;
+          iva_durable_queue_receipt?: unknown;
+        };
+      } | null;
+      const batch = Array.isArray(raw?.message?.iva_parts)
+        ? raw.message.iva_parts
+        : null;
+      const parts = batch ?? [raw?.message];
+      const own = parts
+        .map((message, index) => ({ message, index }))
+        .filter((p) => owns(p.message?.text));
+      if (own.length === 0) {
         forward(req, res, config.upstream, body);
         return;
       }
@@ -127,16 +143,44 @@ export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
         res.end();
         return;
       }
-      const event = eventSchema.safeParse(input);
+      const events = own.map((p) => ({
+        index: p.index,
+        event: eventSchema.safeParse({ ...raw, message: p.message }),
+      }));
       if (
-        !event.success ||
-        !config.owners.includes(event.data.message.from.id)
+        (batch && (batch.length === 0 || batch.length > 20)) ||
+        events.some(
+          (p) =>
+            !p.event.success ||
+            !config.owners.includes(p.event.data.message.from.id),
+        )
       ) {
         res.writeHead(403);
         res.end();
         return;
       }
-      await engine.handle(event.data);
+      for (const part of events) {
+        if (!part.event.success) throw new Error("INVALID_PART");
+        await engine.handle(part.event.data, batch ? part.index : undefined);
+      }
+      const ordinary = parts.filter((message) => !owns(message?.text));
+      if (batch && ordinary.length > 0) {
+        // Keep the upstream queue receipt and maximum update ID, but only ordinary
+        // messages may reach Eve. A downstream turn receipt owns the whole batch.
+        const message = { ...ordinary[0] };
+        if (raw?.message?.iva_durable_queue_receipt !== undefined)
+          message.iva_durable_queue_receipt =
+            raw.message.iva_durable_queue_receipt;
+        delete message.iva_parts;
+        if (ordinary.length > 1) message.iva_parts = ordinary;
+        forward(
+          req,
+          res,
+          config.upstream,
+          Buffer.from(JSON.stringify({ ...raw, message })),
+        );
+        return;
+      }
       res.writeHead(req.url?.endsWith("/accepted") ? 204 : 200, {
         [ACCEPTANCE]: "handled",
       });
