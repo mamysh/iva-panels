@@ -1,0 +1,32 @@
+{
+  "name": "iva-panels",
+  "version": "0.1.0-dev.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Read-only interactive Telegram panels for Iva plugins; experimental local Bridge middleware.",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit": "npm audit --audit-level=high",
+    "check:privacy": "node scripts/privacy.ts",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run check:bundle && npm run check:privacy && npm run audit",
+    "build": "node scripts/build.ts",
+    "check:bundle": "node scripts/build.ts --check"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "esbuild": "0.28.2",
+    "fast-check": "4.9.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3"
+  }
+}

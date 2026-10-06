@@ -1,0 +1,7 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "iva-panels",
+  "version": "0.1.0-dev.1",
+  "description": "Experimental read-only plugin panels for private Telegram chats. Requires explicit Bridge routing configuration; not approved for production installation.",
+  "extensions": { "sh.iva": {} }
+}
