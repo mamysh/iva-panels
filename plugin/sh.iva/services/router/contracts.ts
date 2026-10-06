@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.1.0-dev.2";
+export const VERSION = "0.1.0-dev.3";
 export const PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
 export const TTL = 15 * 60_000;
@@ -90,6 +90,7 @@ export const configSchema = z
     botToken: z.string().regex(/^\d+:[A-Za-z0-9_-]+$/),
     owners: z.array(z.number().int().positive().safe()).min(1),
     mode: z.enum(["passthrough", "panels"]).default("passthrough"),
+    bitrixReadOnly: z.boolean().default(false),
   })
   .strict()
   .superRefine((c, ctx) => {

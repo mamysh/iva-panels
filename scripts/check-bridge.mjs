@@ -1,6 +1,6 @@
 // Optional integration check against an independently installed stock Iva checkout.
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -200,14 +200,14 @@ try {
       text,
     },
   });
-  const tap = (data) => ({
+  const tap = (data, messageId = 1000) => ({
     update_id: updateId++,
     callback_query: {
       id: `synthetic-${updateId}`,
       from: { id: 42, is_bot: false, first_name: "Synthetic" },
       data,
       message: {
-        message_id: 1000,
+        message_id: messageId,
         date: 1,
         from: { id: 424242, is_bot: true },
         chat: { id: 42, type: "private" },
@@ -364,6 +364,67 @@ try {
     await network(router + path, { method: "POST", body: "{}" });
     assert.equal(upstreamCalls.at(-1).path, path);
   }
+
+  // Exercise the bundled adapter through the same stock Bridge, using an isolated
+  // synthetic MCP child. No shared MCP proxy or remote Bitrix call is involved.
+  await stopService();
+  const bitrixRoot = join(directory, "custom/plugins/bitrix24-read");
+  await mkdir(bitrixRoot, { recursive: true });
+  await writeFile(
+    join(bitrixRoot, "plugin.json"),
+    JSON.stringify({ name: "bitrix24-read", version: "0.9.0-rc.1" }),
+  );
+  await writeFile(
+    join(bitrixRoot, "server.mjs"),
+    `
+import { createInterface } from 'node:readline';
+createInterface({input:process.stdin}).on('line', line => {
+ const m=JSON.parse(line); if(m.id===undefined)return;
+ if(m.method==='tools/call' && (m.params.name!=='bitrix24_settings' || m.params.arguments.reply)) throw new Error('Unexpected mutation');
+ const result=m.method==='initialize' ? {protocolVersion:m.params.protocolVersion,capabilities:{tools:{}},serverInfo:{name:'synthetic',version:'1'}} : {content:[{type:'text',text:JSON.stringify({state:'screen',settings:{schema:1,revision:7,policy:{mode:'read_only',uploads:false,deletions:false,people:'ids',email:false}}})}]};
+ console.log(JSON.stringify({jsonrpc:'2.0',id:m.id,result}));
+});`,
+  );
+  const config = JSON.parse(
+    await readFile(join(panels, "config.json"), "utf8"),
+  );
+  config.bitrixReadOnly = true;
+  await writeFile(join(panels, "config.json"), JSON.stringify(config), {
+    mode: 0o600,
+  });
+  await startService();
+  const adapterMessage = nextMessage;
+  await accept(message("/panels"));
+  await promote();
+  const sendsBeforeAdapter = opens().length;
+  let current = opens().at(-1).body;
+  const choose = async (label) => {
+    const button = current.reply_markup.inline_keyboard
+      .flat()
+      .find((b) => b.text === label);
+    assert(button, label);
+    await accept(tap(button.callback_data, adapterMessage));
+    await promote();
+    current = calls
+      .filter(
+        (c) =>
+          c.method === "editMessageText" &&
+          c.body.message_id === adapterMessage,
+      )
+      .at(-1).body;
+  };
+  await choose("Bitrix24");
+  assert(current.text.includes("Ревизия настроек: 7"));
+  await choose("Действия");
+  assert(current.text.includes("только чтение"));
+  await choose("Настройки Bitrix24");
+  await choose("Данные сотрудников");
+  assert(current.text.includes("только ID"));
+  await choose("Настройки Bitrix24");
+  await choose("К плагинам");
+  await choose("Закрыть");
+  assert(current.text.includes("Панель закрыта"));
+  assert.equal(opens().length, sendsBeforeAdapter);
 
   console.log(
     "Bridge integration passed",

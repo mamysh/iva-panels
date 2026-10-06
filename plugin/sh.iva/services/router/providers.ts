@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import type { View } from "./contracts.ts";
+import { bitrixPage, bitrixReader, type BitrixRead } from "./bitrix.ts";
 const titles: Record<string, string> = {
   "bitrix24-read": "Bitrix24",
   "file-delivery": "Отправка файлов",
@@ -24,7 +25,11 @@ const registry = z
 export interface Provider {
   page(id: string): Promise<View>;
 }
-export function installedPanels(data: string): Provider {
+export function installedPanels(
+  data: string,
+  bitrixReadOnly = false,
+  readBitrix: BitrixRead = bitrixReader(data),
+): Provider {
   return {
     async page(id) {
       const path = join(data, "custom", "plugins.json");
@@ -49,8 +54,27 @@ export function installedPanels(data: string): Provider {
             [{ id: "close", label: "Закрыть" }],
           ],
         };
-      const plugin = available.find((p) => p.name === id);
+      const name = id.startsWith("bitrix:") ? "bitrix24-read" : id;
+      const plugin = available.find((p) => p.name === name);
       if (!plugin) throw new Error("PLUGIN_UNAVAILABLE");
+      if (bitrixReadOnly && name === "bitrix24-read")
+        return bitrixPage(id === name ? "home" : id.slice(7), readBitrix);
+      if (id !== name) {
+        if (
+          ![
+            "bitrix:connection",
+            "bitrix:capabilities",
+            "bitrix:actions",
+            "bitrix:privacy",
+          ].includes(id)
+        )
+          throw new Error("PLUGIN_UNAVAILABLE");
+        return {
+          title: "Bitrix24",
+          body: "Просмотр настроек в панелях выключен. Для настройки попросите Иву: «Покажи настройки Битрикс».",
+          rows: [navigation],
+        };
+      }
       return {
         title: titles[id],
         body: `Включён: да\nДоверие: разрешено\nCommit: ${plugin.sha?.slice(0, 12) ?? "не указан"}\n\nПодключение к внешнему сервису: не проверено.\nПоказано состояние регистрации в Иве; права и настройки интеграции не изменяются.`,

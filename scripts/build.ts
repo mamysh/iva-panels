@@ -12,7 +12,7 @@ const result = await build({
   legalComments: "inline",
   minifyWhitespace: true,
   banner: {
-    js: "/*! iva-panels: MIT. Includes Zod: MIT; see plugin/THIRD_PARTY_NOTICES.md. */",
+    js: "/*! iva-panels: MIT. Includes third-party components; see plugin/THIRD_PARTY_NOTICES.md. */\nimport { createRequire as __ivaCreateRequire } from 'node:module'; const require = __ivaCreateRequire(import.meta.url);",
   },
 });
 const text = result.outputFiles[0].contents;
