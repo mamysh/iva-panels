@@ -24,7 +24,7 @@ async function start() {
   const engine = new Engine(
     store,
     installedPanels(ivaData, config.bitrixReadOnly),
-    telegram(config.botToken),
+    telegram(config.botToken, config.presentation),
   );
   const server = createRouter(config, engine);
   server.on("error", () => {

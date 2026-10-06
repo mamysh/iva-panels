@@ -1,5 +1,21 @@
 import type { Delivery } from "./engine.ts";
-export function telegram(token: string): Delivery {
+import { escape, type render } from "./contracts.ts";
+export function richPayload(payload: ReturnType<typeof render>) {
+  const rows = payload.reply_markup.inline_keyboard.map(
+    (row) =>
+      `<tg-button-row>${row.map((button) => `<tg-button type="callback_data"${button.style ? ` style="${button.style}"` : ""} data="${button.callback_data}">${escape(button.text)}</tg-button>`).join("")}</tg-button-row>`,
+  );
+  // render() already escaped title/body as literal HTML. Only our own markup is added.
+  return {
+    rich_message: {
+      html: `<p>${payload.text.replace(/\n/g, "<br>")}</p>${rows.join("")}`,
+    },
+  };
+}
+export function telegram(
+  token: string,
+  presentation: "classic" | "rich" = "classic",
+): Delivery {
   async function call(method: string, payload: unknown) {
     const response = await fetch(
       `https://api.telegram.org/bot${token}/${method}`,
@@ -30,7 +46,13 @@ export function telegram(token: string): Delivery {
   }
   return {
     async send(chat, payload) {
-      const result = await call("sendMessage", { chat_id: chat, ...payload });
+      const result = await call(
+        presentation === "rich" ? "sendRichMessage" : "sendMessage",
+        {
+          chat_id: chat,
+          ...(presentation === "rich" ? richPayload(payload) : payload),
+        },
+      );
       if (!Number.isSafeInteger(result.message_id))
         throw new Error("UNKNOWN_SEND");
       return result.message_id!;
@@ -39,7 +61,9 @@ export function telegram(token: string): Delivery {
       await call("editMessageText", {
         chat_id: chat,
         message_id: message,
-        ...payload,
+        ...(presentation === "rich"
+          ? { ...richPayload(payload), reply_markup: { inline_keyboard: [] } }
+          : payload),
       });
     },
   };

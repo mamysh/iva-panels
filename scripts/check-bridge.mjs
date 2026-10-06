@@ -73,8 +73,9 @@ try {
       res.end(
         JSON.stringify({
           ok: true,
-          result:
-            method === "sendMessage" ? { message_id: nextMessage++ } : true,
+          result: ["sendMessage", "sendRichMessage"].includes(method)
+            ? { message_id: nextMessage++ }
+            : true,
         }),
       );
     }),
@@ -418,7 +419,7 @@ createInterface({input:process.stdin}).on('line', line => {
   await choose("Действия");
   assert(current.text.includes("только чтение"));
   await choose("Настройки Bitrix24");
-  await choose("Данные сотрудников");
+  await choose("Данные");
   assert(current.text.includes("только ID"));
   await choose("Настройки Bitrix24");
   await choose("К плагинам");
@@ -426,6 +427,43 @@ createInterface({input:process.stdin}).on('line', line => {
   assert(current.text.includes("Панель закрыта"));
   assert.equal(opens().length, sendsBeforeAdapter);
 
+  await stopService();
+  config.presentation = "rich";
+  await writeFile(join(panels, "config.json"), JSON.stringify(config), {
+    mode: 0o600,
+  });
+  await startService();
+  const richMessage = nextMessage;
+  await accept(message("/panels"));
+  await promote();
+  let rich = calls.filter((c) => c.method === "sendRichMessage").at(-1).body
+    .rich_message.html;
+  assert(rich.includes("<tg-button-row>"));
+  const richButton = (label) => {
+    const buttons = [
+      ...rich.matchAll(
+        /<tg-button\b[^>]*data="([^"]+)"[^>]*>([^<]+)<\/tg-button>/g,
+      ),
+    ];
+    return buttons.find((m) => m[2] === label)[1];
+  };
+  for (const label of [
+    "Bitrix24",
+    "Действия",
+    "Настройки Bitrix24",
+    "Закрыть",
+  ]) {
+    await accept(tap(richButton(label), richMessage));
+    await promote();
+    rich = calls
+      .filter(
+        (c) =>
+          c.method === "editMessageText" && c.body.message_id === richMessage,
+      )
+      .at(-1).body.rich_message.html;
+  }
+  assert(rich.includes("Панель закрыта"));
+  assert.equal(calls.filter((c) => c.method === "sendRichMessage").length, 1);
   console.log(
     "Bridge integration passed",
     execFileSync("git", ["-C", core, "rev-parse", "HEAD"], {
