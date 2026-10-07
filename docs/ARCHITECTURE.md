@@ -11,11 +11,14 @@ flowchart LR
     R -->|Обычные запросы| E[Исходный Eve]
     R -->|/panels и ipanel:| S[Persistent screen engine]
     S <--> D[(Приватное состояние)]
-    S --> P[Read-only provider]
+    S --> P[Plugin providers]
     P --> I[(Реестр плагинов Ивы)]
     P -->|Явный opt-in| C[Отдельный stdio MCP client]
     C --> X[Установленный Bitrix24
 settings и diagnostics]
+    P --> F[File-delivery manifest и правила]
+    F -->|Проверить stable| G[Публичный GitHub GET
+fixed repo и pinned SHA]
     S --> A[Telegram Bot API
 sendMessage / editMessageText]
     A --> T
@@ -74,3 +77,7 @@ Durable inbox объединяет быстрые сообщения в `message
 ## Изменение локальной политики Bitrix24
 
 Явный opt-in добавляет prepare/confirm/cancel к существующему settings tool. Engine сохраняет acting до вызова provider, затем сохраняет view/revision/editing и доставляет его. Reply выводится из сохранённой кнопки; preview UUID не передаётся в callback_data. Повтор editing доставляет только view. Повтор acting читает текущие настройки через recover и не вызывает действие снова. Формат старых экранов читается, но старый бинарник не понимает acting phase. [ADR 0003](adr/0003-confirmed-bitrix-settings.md).
+
+## Панель отправки файлов
+
+`files.ts` читает ограниченный manifest и показывает правила известного выпуска. Подстраницы `files:rules/updates/check` разрешены только для включённого и доверенного file-delivery. Только check обращается к фиксированному GitHub без credentials: stable commit → manifest по SHA → последний push ci.yml по SHA. Он не вызывает штатный updater и не затрагивает update offer. Установка остаётся в обычном диалоге Ивы.

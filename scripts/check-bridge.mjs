@@ -48,9 +48,21 @@ try {
           trusted: true,
           sha: "synthetic",
         },
-        { name: "file-delivery", enabled: true, trusted: true },
+        {
+          name: "file-delivery",
+          enabled: true,
+          trusted: true,
+          sha: "a".repeat(40),
+        },
       ],
     }),
+  );
+  await mkdir(join(directory, "custom/plugins/file-delivery"), {
+    recursive: true,
+  });
+  await writeFile(
+    join(directory, "custom/plugins/file-delivery/plugin.json"),
+    JSON.stringify({ name: "file-delivery", version: "0.3.2" }),
   );
   const upstream = await listen(
     createServer(async (req, res) => {
@@ -108,7 +120,7 @@ try {
   const preload = join(directory, "synthetic-telegram.mjs");
   await writeFile(
     preload,
-    `const network=globalThis.fetch;globalThis.fetch=(url,init)=>{const u=new URL(String(url));if(u.hostname==='api.telegram.org')return network(process.env.SYNTHETIC_BOT_ORIGIN+'/'+u.pathname.split('/').at(-1),init);if(u.hostname!=='127.0.0.1')throw new Error('Unexpected external request');return network(url,init);};`,
+    `const network=globalThis.fetch;globalThis.fetch=(url,init)=>{const u=new URL(String(url));if(u.hostname==='api.telegram.org')return network(process.env.SYNTHETIC_BOT_ORIGIN+'/'+u.pathname.split('/').at(-1),init);if(u.hostname==='api.github.com'&&u.pathname==='/repos/mamysh/iva-file-delivery/commits/stable')return Promise.resolve(new Response(JSON.stringify({sha:'b'.repeat(40)})));if(u.hostname==='raw.githubusercontent.com'&&u.pathname==='/mamysh/iva-file-delivery/'+ 'b'.repeat(40)+'/plugin/plugin.json')return Promise.resolve(new Response(JSON.stringify({name:'file-delivery',version:'0.3.3'})));if(u.hostname==='api.github.com'&&u.pathname==='/repos/mamysh/iva-file-delivery/actions/runs')return Promise.resolve(new Response(JSON.stringify({workflow_runs:[{head_sha:'b'.repeat(40),path:'.github/workflows/ci.yml',event:'push',status:'completed',conclusion:'success',run_number:1,run_attempt:1}]})));if(u.hostname!=='127.0.0.1')throw new Error('Unexpected external request');return network(url,init);};`,
   );
   async function startService() {
     child = spawn(
@@ -458,6 +470,14 @@ createInterface({input:process.stdin}).on('line', line => {
     "Bitrix24",
     "Действия",
     "Настройки Bitrix24",
+    "К плагинам",
+    "Отправка файлов",
+    "Правила отправки",
+    "Отправка файлов",
+    "Обновления",
+    "Проверить stable",
+    "Отправка файлов",
+    "К плагинам",
     "Закрыть",
   ]) {
     await accept(tap(richButton(label), richMessage));
@@ -468,6 +488,11 @@ createInterface({input:process.stdin}).on('line', line => {
           c.method === "editMessageText" && c.body.message_id === richMessage,
       )
       .at(-1).body.rich_message.html;
+    if (label === "Правила отправки") assert(rich.includes("50 МиБ"));
+    if (label === "Проверить stable") {
+      assert(rich.includes("CI stable: успешен"));
+      assert(rich.includes("более новая версия"));
+    }
   }
   assert(rich.includes("Панель закрыта"));
   assert.equal(calls.filter((c) => c.method === "sendRichMessage").length, 1);

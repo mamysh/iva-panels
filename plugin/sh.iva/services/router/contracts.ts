@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.1.0-dev.5";
+export const VERSION = "0.1.0-dev.6";
 export const PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
 export const TTL = 15 * 60_000;

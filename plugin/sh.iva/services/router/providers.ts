@@ -11,6 +11,7 @@ import {
   type BitrixRead,
   type BitrixChange,
 } from "./bitrix.ts";
+import { filePage, fileUpdateCheck, type FileCheck } from "./files.ts";
 const titles: Record<string, string> = {
   "bitrix24-read": "Bitrix24",
   "file-delivery": "Отправка файлов",
@@ -41,6 +42,7 @@ export function installedPanels(
   readBitrix: BitrixRead = bitrixReader(data),
   bitrixSettings = false,
   changeBitrix: BitrixChange = bitrixChanger(data),
+  checkFiles: FileCheck = fileUpdateCheck(),
 ): Provider {
   const provider: Provider = {
     isMutation: (id) => isBitrixChange(id),
@@ -88,9 +90,15 @@ export function installedPanels(
             [{ id: "close", label: "Закрыть" }],
           ],
         };
-      const name = id.startsWith("bitrix:") ? "bitrix24-read" : id;
+      const name = id.startsWith("bitrix:")
+        ? "bitrix24-read"
+        : id.startsWith("files:")
+          ? "file-delivery"
+          : id;
       const plugin = available.find((p) => p.name === name);
       if (!plugin) throw new Error("PLUGIN_UNAVAILABLE");
+      if (name === "file-delivery")
+        return filePage(data, id, plugin.sha, checkFiles);
       if (isBitrixChange(id)) {
         if (!bitrixReadOnly || !bitrixSettings)
           return {
