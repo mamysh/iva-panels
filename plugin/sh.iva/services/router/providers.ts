@@ -1,4 +1,3 @@
-import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import type { View } from "./contracts.ts";
@@ -12,25 +11,27 @@ import {
   type BitrixChange,
 } from "./bitrix.ts";
 import { filePage, fileUpdateCheck, type FileCheck } from "./files.ts";
+import {
+  entrySchema,
+  smallJson,
+  cardId,
+  pluginKey,
+  pluginMetadata,
+  pluginDefinition,
+  definitionPage,
+  basicCard,
+} from "./catalog.ts";
 const titles: Record<string, string> = {
   "bitrix24-read": "Bitrix24",
   "file-delivery": "Отправка файлов",
 };
 const registry = z
-  .object({
-    plugins: z.array(
-      z
-        .object({
-          name: z.string(),
-          version: z.string().optional(),
-          enabled: z.boolean(),
-          trusted: z.boolean(),
-          sha: z.string().optional(),
-        })
-        .passthrough(),
-    ),
-  })
-  .passthrough();
+  .object({ plugins: z.array(entrySchema).max(1000) })
+  .passthrough()
+  .refine(
+    (r) => new Set(r.plugins.map((p) => p.name)).size === r.plugins.length,
+  );
+const PAGE_SIZE = 5;
 export interface Provider {
   page(id: string): Promise<View>;
   isMutation?(id: string): boolean;
@@ -68,35 +69,81 @@ export function installedPanels(
       };
     },
     async page(id) {
-      const path = join(data, "custom", "plugins.json");
-      if ((await stat(path)).size > 5 * 1024 * 1024)
-        throw new Error("REGISTRY_TOO_LARGE");
       const plugins = registry.parse(
-        JSON.parse(await readFile(path, "utf8")),
+        await smallJson(join(data, "custom/plugins.json"), 5 * 1024 * 1024),
       ).plugins;
-      const available = plugins.filter(
-        (p) => titles[p.name] && p.enabled && p.trusted,
-      );
       const navigation = [
         { id: "home", label: "К плагинам" },
         { id: "close", label: "Закрыть" },
       ];
-      if (id === "home")
+      if (id === "home" || /^catalog:(0|[1-9]\d{0,2})$/.test(id)) {
+        const pages = Math.max(1, Math.ceil(plugins.length / PAGE_SIZE));
+        const page = Math.min(
+          id === "home" ? 0 : Number(id.slice(8)),
+          pages - 1,
+        );
+        const rows = plugins
+          .slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+          .map((p) => [
+            {
+              id:
+                titles[p.name] && p.enabled && p.trusted
+                  ? p.name
+                  : cardId(p.name),
+              label: `${(titles[p.name] ?? p.name).slice(0, 45)}${!p.enabled ? " · выключен" : !p.trusted ? " · без доверия" : ""}`,
+            },
+          ]);
+        const paging = [
+          ...(page > 0 ? [{ id: `catalog:${page - 1}`, label: "Назад" }] : []),
+          ...(page < pages - 1
+            ? [{ id: `catalog:${page + 1}`, label: "Далее" }]
+            : []),
+        ];
         return {
           title: "Плагины",
-          body: "Локальное состояние установленных интеграций. Доступность внешних сервисов здесь не проверяется.",
+          body: `Установлено: ${plugins.length}\nСтраница ${page + 1} из ${pages}\n\nСостояние регистрации в Иве. Работу служб и внешних сервисов здесь не проверяли.`,
           rows: [
-            ...available.map((p) => [{ id: p.name, label: titles[p.name] }]),
-            [{ id: "close", label: "Закрыть" }],
+            ...rows,
+            ...(paging.length ? [paging] : []),
+            [
+              { id: `catalog:${page}`, label: "Обновить список" },
+              { id: "close", label: "Закрыть" },
+            ],
           ],
         };
+      }
+      const generic =
+        /^(plugin|panel):([a-f0-9]{24})(?::([a-z][a-z0-9-]{0,23}))?$/.exec(id);
+      if (generic) {
+        if ((generic[1] === "plugin") === Boolean(generic[3]))
+          throw new Error("PLUGIN_UNAVAILABLE");
+        const matches = plugins.filter((p) => pluginKey(p.name) === generic[2]);
+        if (matches.length !== 1)
+          return {
+            title: "Плагин недоступен",
+            body: "Плагин удалён или список изменился. Обновите список.",
+            rows: [navigation],
+          };
+        const p = matches[0],
+          metadata = await pluginMetadata(data, p);
+        const definition = await pluginDefinition(data, p, metadata?.version);
+        if (
+          generic[1] === "panel" &&
+          definition?.pages.some((page) => page.id === generic[3])
+        )
+          return definitionPage(p.name, definition, generic[3]);
+        return basicCard(p, metadata, definition);
+      }
       const name = id.startsWith("bitrix:")
         ? "bitrix24-read"
         : id.startsWith("files:")
           ? "file-delivery"
           : id;
-      const plugin = available.find((p) => p.name === name);
+      const plugin = plugins.find((p) => p.name === name);
       if (!plugin) throw new Error("PLUGIN_UNAVAILABLE");
+      if (!plugin.enabled || !plugin.trusted)
+        return basicCard(plugin, await pluginMetadata(data, plugin));
+      if (!titles[name]) throw new Error("PLUGIN_UNAVAILABLE");
       if (name === "file-delivery")
         return filePage(data, id, plugin.sha, checkFiles);
       if (isBitrixChange(id)) {

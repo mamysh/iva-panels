@@ -84,7 +84,7 @@ test("file actions check enabled/trusted every time; check failures preserve bac
       plugins: [{ name: "file-delivery", enabled: true, trusted: false }],
     }),
   );
-  await assert.rejects(provider.page("files:check"));
+  assert((await provider.page("files:check")).body.includes("не разрешено"));
 });
 function network(responses: unknown[]) {
   const urls: string[] = [];

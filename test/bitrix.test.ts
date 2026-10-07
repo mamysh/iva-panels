@@ -102,8 +102,10 @@ test("explicit opt-in and enabled/trusted registry guard apply to every Bitrix s
     { ...plugin, trusted: false },
   ]) {
     await writeFile(path, JSON.stringify({ plugins: [disabled] }));
-    await assert.rejects(
-      installedPanels(data, true, read).page("bitrix:actions"),
+    assert(
+      (
+        await installedPanels(data, true, read).page("bitrix:actions")
+      ).body.includes("Собственные разделы доступны"),
     );
   }
   assert.equal(calls, 1);

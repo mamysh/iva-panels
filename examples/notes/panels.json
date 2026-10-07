@@ -1,0 +1,20 @@
+{
+  "schema": "iva-panels/v1",
+  "plugin": "notes-example",
+  "pluginVersion": "1.0.0",
+  "entry": "home",
+  "pages": [
+    {
+      "id": "home",
+      "title": "Заметки",
+      "body": "Сведения о возможностях плагина заметок.",
+      "rows": [[{ "label": "Возможности", "target": "features" }]]
+    },
+    {
+      "id": "features",
+      "title": "Заметки · Возможности",
+      "body": "Этот пример показывает подключение разделов. Запись заметок через кнопки не реализована.",
+      "rows": [[{ "label": "К разделам", "target": "home" }]]
+    }
+  ]
+}

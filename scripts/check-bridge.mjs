@@ -48,6 +48,8 @@ try {
           trusted: true,
           sha: "synthetic",
         },
+        { name: "demo", enabled: true, trusted: true },
+        { name: "offline", enabled: false, trusted: false },
         {
           name: "file-delivery",
           enabled: true,
@@ -63,6 +65,34 @@ try {
   await writeFile(
     join(directory, "custom/plugins/file-delivery/plugin.json"),
     JSON.stringify({ name: "file-delivery", version: "0.3.2" }),
+  );
+  await mkdir(join(directory, "custom/plugins/demo"), { recursive: true });
+  await writeFile(
+    join(directory, "custom/plugins/demo/plugin.json"),
+    JSON.stringify({ name: "demo", version: "1.0.0" }),
+  );
+  await writeFile(
+    join(directory, "custom/plugins/demo/panels.json"),
+    JSON.stringify({
+      schema: "iva-panels/v1",
+      plugin: "demo",
+      pluginVersion: "1.0.0",
+      entry: "home",
+      pages: [
+        {
+          id: "home",
+          title: "Synthetic demo",
+          body: "Contract page",
+          rows: [[{ label: "Details", target: "details" }]],
+        },
+        {
+          id: "details",
+          title: "Synthetic details",
+          body: "Contract details",
+          rows: [[{ label: "Demo home", target: "home" }]],
+        },
+      ],
+    }),
   );
   const upstream = await listen(
     createServer(async (req, res) => {
@@ -478,6 +508,14 @@ createInterface({input:process.stdin}).on('line', line => {
     "Проверить stable",
     "Отправка файлов",
     "К плагинам",
+    "offline · выключен",
+    "К плагинам",
+    "demo",
+    "Открыть разделы",
+    "Details",
+    "Demo home",
+    "О плагине",
+    "К плагинам",
     "Закрыть",
   ]) {
     await accept(tap(richButton(label), richMessage));
@@ -488,6 +526,9 @@ createInterface({input:process.stdin}).on('line', line => {
           c.method === "editMessageText" && c.body.message_id === richMessage,
       )
       .at(-1).body.rich_message.html;
+    if (label === "Details") assert(rich.includes("Contract details"));
+    if (label === "offline · выключен")
+      assert(rich.includes("Состояние: выключен"));
     if (label === "Правила отправки") assert(rich.includes("50 МиБ"));
     if (label === "Проверить stable") {
       assert(rich.includes("CI stable: успешен"));

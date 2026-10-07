@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { installedPanels } from "../plugin/sh.iva/services/router/providers.ts";
-test("only known enabled trusted integrations are listed; no connectivity claims", async (t) => {
+test("catalog includes unknown and untrusted plugins; built-in adapters remain guarded", async (t) => {
   const data = await mkdtemp(join(tmpdir(), "panels-registry-"));
   t.after(() => rm(data, { recursive: true, force: true }));
   await mkdir(join(data, "custom"));
@@ -25,9 +25,9 @@ test("only known enabled trusted integrations are listed; no connectivity claims
   );
   const provider = installedPanels(data);
   const home = await provider.page("home");
-  assert.equal(home.rows.length, 2);
+  assert.equal(home.rows.length, 4);
   assert.equal(home.rows[0][0].id, "bitrix24-read");
   assert((await provider.page("bitrix24-read")).body.includes("не проверено"));
-  await assert.rejects(provider.page("file-delivery"));
+  assert((await provider.page("file-delivery")).body.includes("не разрешено"));
   await assert.rejects(provider.page("unknown"));
 });
