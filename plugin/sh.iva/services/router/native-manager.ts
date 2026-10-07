@@ -11,10 +11,14 @@ const sourceHashes = {
   "scripts/cli/plugin.ts":
     "1999e073129e13f71fa1bed476f946fe34fd4f29d12afa8db66459599c834b3a",
 };
+export function supportedVersion(name: string) {
+  return /^0\.4\.12-5cf8f1963c82(?:\+[a-f0-9]{8})?(?:~[1-9][0-9]*)?$/.test(
+    name,
+  );
+}
 export async function supportedManager(cli: string, data: string) {
   const root = dirname(dirname(await realpath(cli)));
-  if (!/^0\.4\.12-5cf8f1963c82(?:\+[a-f0-9]{8})?$/.test(basename(root)))
-    throw new Error("UNSUPPORTED_MANAGER");
+  if (!supportedVersion(basename(root))) throw new Error("UNSUPPORTED_MANAGER");
   const home = dirname(dirname(root));
   if ((await realpath(data)) !== (await realpath(join(home, "data"))))
     throw new Error("UNSUPPORTED_LAYOUT");

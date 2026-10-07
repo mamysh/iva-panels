@@ -188,7 +188,7 @@ try {
     await readFile(join(core, "package.json"), "utf8"),
   ).version;
   if (version === "0.4.12") {
-    const root = join(home, "versions/0.4.12-5cf8f1963c82+deadbeef");
+    const root = join(home, "versions/0.4.12-5cf8f1963c82+deadbeef~2");
     await mkdir(join(root, "bin"), { recursive: true });
     await writeFile(join(root, "bin/iva.mjs"), "// synthetic entry\n");
     for (const file of [

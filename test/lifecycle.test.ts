@@ -646,3 +646,27 @@ test("production manager compatibility gate rejects unknown CLI before any effec
   assert.equal((await readJob(life.dir, id)).issue, "unsupported_manager");
   assert.equal((await registered(f.data))[0].enabled, true);
 });
+
+test("stock force-build generation suffixes retain compatibility without accepting another core", async () => {
+  const { supportedVersion } =
+    await import("../plugin/sh.iva/services/router/native-manager.ts");
+  fc.assert(
+    fc.property(
+      fc.integer({ min: 1, max: 1000000 }),
+      fc.constant("62dbd973"),
+      (generation, overlay) => {
+        assert.equal(
+          supportedVersion(`0.4.12-5cf8f1963c82+${overlay}~${generation}`),
+          true,
+        );
+      },
+    ),
+  );
+  for (const name of [
+    "0.4.12-5cf8f1963c82+62dbd973~0",
+    "0.4.12-5cf8f1963c82+62dbd973~oops",
+    "0.4.13-5cf8f1963c82+62dbd973~2",
+    "0.4.12-aaaaaaaaaaaa+62dbd973~2",
+  ])
+    assert.equal(supportedVersion(name), false);
+});
