@@ -7,6 +7,7 @@ import {
   rm,
   symlink,
   readdir,
+  readFile,
 } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -416,5 +417,34 @@ test("unit checker requires exact ActiveState and treats unavailable or failed u
   } finally {
     if (original === undefined) delete process.env.PATH;
     else process.env.PATH = original;
+  }
+});
+
+test("native CLI finds user-local uv without inheriting the bot environment", async (t) => {
+  const f = await fixture(t);
+  const bin = join(f.root, ".local/bin");
+  await mkdir(bin, { recursive: true });
+  await writeFile(join(bin, "uv"), "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+  const script = join(f.root, "native-before.mjs");
+  await writeFile(
+    script,
+    "import {execFileSync} from 'node:child_process';execFileSync('uv',['--version'],{stdio:'ignore'});" +
+      (await readFile(script, "utf8")),
+  );
+  const life = new Lifecycle(f.data, f.panels, { cli: f.cli }, async () => {});
+  const id = jobId(await life.page(`life:prepare:${f.key}:disable`));
+  await life.page(`life:confirm:${id}`);
+  const priorHome = process.env.HOME,
+    priorToken = process.env.TELEGRAM_BOT_TOKEN;
+  try {
+    process.env.HOME = f.root;
+    process.env.TELEGRAM_BOT_TOKEN = "123:synthetic";
+    await runJob(f.data, f.panels, id, undefined, async () => true);
+    assert.equal((await readJob(life.dir, id)).phase, "done");
+  } finally {
+    if (priorHome === undefined) delete process.env.HOME;
+    else process.env.HOME = priorHome;
+    if (priorToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+    else process.env.TELEGRAM_BOT_TOKEN = priorToken;
   }
 });

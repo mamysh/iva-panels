@@ -26,7 +26,12 @@ export const nativeRun: Runner = (cli, args, data) =>
       "LANG",
     ])
       if (process.env[key]) env[key] = process.env[key];
-    env.PATH = `${dirname(process.execPath)}:/usr/bin:/bin`;
+    env.PATH = [
+      dirname(process.execPath),
+      ...(env.HOME ? [join(env.HOME, ".local/bin")] : []),
+      "/usr/bin",
+      "/bin",
+    ].join(":");
     const child = spawn(process.execPath, [cli, ...args], {
       env,
       stdio: "ignore",
