@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import fc from "fast-check";
 import assert from "node:assert/strict";
 import {
   mkdtemp,
@@ -16,10 +17,12 @@ import {
   readJob,
   saveJob,
   fingerprint,
+  registryFingerprint,
   registered,
 } from "../plugin/sh.iva/services/router/lifecycle.ts";
 import {
-  runJob,
+  runJob as checkedRunJob,
+  nativeRun,
   lifecycleUnits,
   unitsHealthy,
 } from "../plugin/sh.iva/services/router/lifecycle-worker.ts";
@@ -29,6 +32,14 @@ import {
   render,
   configSchema,
 } from "../plugin/sh.iva/services/router/contracts.ts";
+// Synthetic CLI fixtures have no managed immutable tree; production defaults are
+// covered separately against the unchanged stock updater.
+function runJob(...args: Parameters<typeof checkedRunJob>) {
+  args[3] ??= nativeRun;
+  args[6] ??= async () => true;
+  args[7] ??= async () => true;
+  return checkedRunJob(...args);
+}
 async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   const root = await mkdtemp(join(tmpdir(), "panels-lifecycle-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -177,7 +188,7 @@ test("queued launch is durable, duplicate/recovery never launch twice, global bu
   await life.page(`life:confirm:${b}`);
   assert.equal(launched, 1);
   const old = await readJob(life.dir, a);
-  old.phase = "uncertain";
+  old.phase = "cancelled";
   await saveJob(life.dir, old);
   const failing = new Lifecycle(f.data, f.panels, { cli: f.cli }, async () => {
     launched++;
@@ -447,4 +458,191 @@ test("native CLI finds user-local uv without inheriting the bot environment", as
     if (priorToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
     else process.env.TELEGRAM_BOT_TOKEN = priorToken;
   }
+});
+
+test("successful target toggle cannot hide a removed, added or disabled neighbor", async (t) => {
+  for (const kind of ["disabled", "removed", "added"] as const) {
+    const f = await fixture(t);
+    const peer = { ...f.entry, name: "peer" };
+    await writeFile(f.registry, JSON.stringify({ plugins: [f.entry, peer] }));
+    const life = new Lifecycle(
+      f.data,
+      f.panels,
+      { cli: f.cli },
+      async () => {},
+    );
+    const id = jobId(await life.page(`life:prepare:${f.key}:disable`));
+    await life.page(`life:confirm:${id}`);
+    await runJob(
+      f.data,
+      f.panels,
+      id,
+      async () => {
+        const peers =
+          kind === "removed" ? [] : [{ ...peer, enabled: kind !== "disabled" }];
+        if (kind === "added") peers.push({ ...peer, name: "new" });
+        await writeFile(
+          f.registry,
+          JSON.stringify({
+            plugins: [{ ...f.entry, enabled: false }, ...peers],
+          }),
+        );
+        return 0;
+      },
+      async () => true,
+    );
+    const result = await readJob(life.dir, id);
+    assert.equal(result.phase, "uncertain");
+    assert.equal(result.issue, "registry_changed");
+    assert.equal(await life.busy(), true);
+    assert.match(life.status(result).body, /другой плагин/);
+    assert.equal(
+      (await registered(f.data))[0].enabled,
+      false,
+      "no automatic undo",
+    );
+  }
+});
+test("neighbor change before confirm or worker refuses all effects", async (t) => {
+  const f = await fixture(t);
+  const peer = { ...f.entry, name: "peer" };
+  await writeFile(f.registry, JSON.stringify({ plugins: [f.entry, peer] }));
+  let calls = 0;
+  const life = new Lifecycle(f.data, f.panels, { cli: f.cli }, async () => {
+    calls++;
+  });
+  const id = jobId(await life.page(`life:prepare:${f.key}:disable`));
+  await writeFile(
+    f.registry,
+    JSON.stringify({ plugins: [f.entry, { ...peer, trusted: false }] }),
+  );
+  await life.page(`life:confirm:${id}`);
+  assert.equal(calls, 0);
+  assert.equal((await readJob(life.dir, id)).phase, "failed");
+  await writeFile(f.registry, JSON.stringify({ plugins: [f.entry, peer] }));
+  const next = jobId(await life.page(`life:prepare:${f.key}:disable`));
+  await life.page(`life:confirm:${next}`);
+  await writeFile(f.registry, JSON.stringify({ plugins: [f.entry] }));
+  await runJob(
+    f.data,
+    f.panels,
+    next,
+    async () => {
+      calls++;
+      return 0;
+    },
+    async () => true,
+  );
+  assert.equal(calls, 1, "only launch, never the runner");
+  assert.equal((await readJob(life.dir, next)).phase, "failed");
+});
+test("missing final artifacts and failed peer services never report success", async (t) => {
+  for (const mode of ["artifacts", "services"]) {
+    const f = await fixture(t);
+    const peer = { ...f.entry, name: "peer" };
+    await writeFile(f.registry, JSON.stringify({ plugins: [f.entry, peer] }));
+    const life = new Lifecycle(
+      f.data,
+      f.panels,
+      { cli: f.cli },
+      async () => {},
+    );
+    const id = jobId(await life.page(`life:prepare:${f.key}:disable`));
+    await life.page(`life:confirm:${id}`);
+    let completed = false;
+    await runJob(
+      f.data,
+      f.panels,
+      id,
+      async () => {
+        await writeFile(
+          f.registry,
+          JSON.stringify({ plugins: [{ ...f.entry, enabled: false }, peer] }),
+        );
+        completed = true;
+        return 0;
+      },
+      async () => true,
+      async (e) => !(completed && mode === "services" && e.name === "peer"),
+      async () => !(completed && mode === "artifacts"),
+    );
+    assert.equal((await readJob(life.dir, id)).phase, "uncertain");
+    assert.equal(
+      (await readJob(life.dir, id)).issue,
+      mode === "artifacts" ? "artifacts_missing" : "services_failed",
+    );
+  }
+});
+
+test("whole registry fingerprint ignores list order and detects any neighbor switch", () => {
+  fc.assert(
+    fc.property(
+      fc.uniqueArray(fc.integer({ min: 0, max: 999 }), {
+        minLength: 2,
+        maxLength: 40,
+      }),
+      fc.boolean(),
+      (ids, flag) => {
+        const entries = ids.map((id) => ({
+          name: `plugin-${id}`,
+          enabled: flag,
+          trusted: true,
+          sha: "a".repeat(40),
+        }));
+        assert.equal(
+          registryFingerprint(entries),
+          registryFingerprint([...entries].reverse()),
+        );
+        const changed = entries.map((e, i) =>
+          i === entries.length - 1 ? { ...e, enabled: !e.enabled } : e,
+        );
+        assert.notEqual(
+          registryFingerprint(entries),
+          registryFingerprint(changed),
+        );
+      },
+    ),
+  );
+});
+test("failed userbot preflight never executes a manager command", async (t) => {
+  const f = await fixture(t);
+  const life = new Lifecycle(f.data, f.panels, { cli: f.cli }, async () => {});
+  const id = jobId(await life.page(`life:prepare:${f.key}:disable`));
+  await life.page(`life:confirm:${id}`);
+  let calls = 0;
+  await runJob(
+    f.data,
+    f.panels,
+    id,
+    async () => {
+      calls++;
+      return 0;
+    },
+    async () => true,
+    async () => true,
+    async () => true,
+    async () => false,
+  );
+  assert.equal(calls, 0);
+  assert.equal((await readJob(life.dir, id)).phase, "failed");
+});
+
+test("production manager compatibility gate rejects unknown CLI before any effect", async (t) => {
+  const f = await fixture(t);
+  const life = new Lifecycle(f.data, f.panels, { cli: f.cli }, async () => {});
+  const id = jobId(await life.page(`life:prepare:${f.key}:disable`));
+  await life.page(`life:confirm:${id}`);
+  await checkedRunJob(
+    f.data,
+    f.panels,
+    id,
+    undefined,
+    async () => true,
+    async () => true,
+    async () => true,
+    async () => true,
+  );
+  assert.equal((await readJob(life.dir, id)).phase, "failed");
+  assert.equal((await readJob(life.dir, id)).issue, "unsupported_manager");
+  assert.equal((await registered(f.data))[0].enabled, true);
 });

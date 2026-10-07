@@ -66,3 +66,5 @@ jobs:
           persist-credentials: false
       - run: node scripts/check-bridge.mjs compat-core compat-bitrix/plugin
       - run: node scripts/check-lifecycle.mjs compat-core
+
+      - run: node scripts/check-forced-build.mjs compat-core

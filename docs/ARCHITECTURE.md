@@ -20,7 +20,8 @@ flowchart LR
 settings и diagnostics]
     P -->|lifecycle opt-in| L[Превью и приватный журнал задач]
     L --> W[Отдельная systemd worker unit]
-    W --> N[Штатный CLI enable / disable]
+    W --> N[Native adapter: штатный enable / disable]
+    N --> V[Полная штатная сборка текущего commit]
     N --> U[Реестр, службы и сборка Ивы]
     W --> H[Проверка версии, служб и health]
     P --> F[File-delivery manifest и правила]
@@ -92,3 +93,5 @@ Durable inbox объединяет быстрые сообщения в `message
 ## Управление плагинами
 
 Встроенный lifecycle provider работает независимо от descriptor. Engine сохраняет acting и ID действия до provider. Confirm сохраняет queued до systemd-run; worker сохраняет running до CLI. Поэтому сбой engine восстанавливает только чтение результата, а CLI переживает рестарт Eve/Router. Ни delivery retry, ни кнопка проверки результата не повторяют команду. Статусы и пределы описаны в [ADR0006](adr/0006-native-lifecycle.md). Shared screen state читает только Router; worker меняет отдельный job файл. Update/downgrade исключает pending задачи.
+
+Dev.10 дополняет lifecycle [ADR0007](adr/0007-stock-force-management.md): native adapter использует неизменённые modules ядра, запрещает reuse, проверяет весь набор плагинов до и после операции. Неоднозначный результат блокирует дальнейшее управление; исходники ядра не меняются.

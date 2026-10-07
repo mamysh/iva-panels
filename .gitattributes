@@ -1,3 +1,5 @@
 # Generated dependency template literals retain meaningful source whitespace.
 plugin/sh.iva/services/router/server.mjs whitespace=-blank-at-eol
 plugin/sh.iva/services/router/lifecycle-worker.mjs whitespace=-blank-at-eol
+
+plugin/sh.iva/services/router/native-manager.mjs whitespace=-blank-at-eol

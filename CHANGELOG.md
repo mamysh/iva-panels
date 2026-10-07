@@ -1,3 +1,11 @@
+## 0.1.0-dev.10
+
+- Управление stock Ивой 0.4.12 без правок ядра: неизменённый native manager и полная сборка закреплённого текущего commit вместо небезопасного reuse.
+- Проверка всего реестра, соседних служб, extension/MCP artifacts и authenticated userbot health.
+- Stale изменение соседа отклоняет запуск; побочный эффект даёт uncertain с именами и блокирует дальнейшее управление.
+- Регрессия настоящего stock updater воспроизводит прежний сбой и проверяет native disable/enable через новый build callback.
+- Старые задания читаются; downgrade parser после создания dev.10 jobs не поддержан, route rollback сохраняет код и состояние.
+
 ## 0.1.0-dev.9
 
 - Native CLI получает Node bin и пользовательский HOME/.local/bin в ограниченном PATH. Это позволяет штатному updater найти установленный uv и восстановить окружение Telegram userbot при смене версии Ивы.

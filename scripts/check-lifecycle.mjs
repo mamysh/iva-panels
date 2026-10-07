@@ -123,6 +123,8 @@ try {
       runner,
       async () => true,
       async () => true,
+      async () => true,
+      async () => true,
     ),
   );
   const prepare = async (target) => {
@@ -149,6 +151,8 @@ try {
     panels,
     id,
     runner,
+    async () => true,
+    async () => true,
     async () => true,
     async () => true,
   );

@@ -28,11 +28,27 @@ export const jobSchema = z
     name: entrySchema.shape.name,
     target: z.boolean(),
     fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    registryFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    issue: z
+      .enum([
+        "registry_changed",
+        "services_failed",
+        "artifacts_missing",
+        "manager_failed",
+        "unsupported_manager",
+        "preflight_failed",
+      ])
+      .optional(),
     created: z.number().finite(),
     expires: z.number().finite(),
     cli: z.string(),
+    affected: z.array(entrySchema.shape.name).max(10).optional(),
     submitted: z.number().finite().optional(),
     started: z.number().finite().optional(),
+    completed: z.number().finite().optional(),
     phase: z.enum([
       "preview",
       "cancelled",
@@ -66,11 +82,24 @@ export function fingerprint(entry: PluginEntry) {
         entry.enabled,
         entry.trusted,
         entry.sha,
+        entry.ref,
+        entry.version,
         entry.digest,
         entry.source,
         entry.mcp,
         entry.services,
       ]),
+    )
+    .digest("hex");
+}
+export function registryFingerprint(entries: PluginEntry[]) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        entries
+          .map((e) => [e.name, fingerprint(e)])
+          .sort((a, b) => a[0].localeCompare(b[0])),
+      ),
     )
     .digest("hex");
 }
@@ -179,7 +208,7 @@ export class Lifecycle {
     if (names.length >= 100) throw new Error("LIFECYCLE_CAPACITY");
     for (const name of names) {
       const j = await readJob(this.dir, name.slice(0, -5));
-      if (["queued", "running"].includes(j.phase)) return true;
+      if (["queued", "running", "uncertain"].includes(j.phase)) return true;
     }
     return false;
   }
@@ -204,18 +233,33 @@ export class Lifecycle {
         "Передача отдельной задаче сохранена. Проверьте результат; при сбое запуска команда автоматически не повторяется.",
       running:
         "Штатный менеджер выполняет команду. Ива может ненадолго перезапуститься.",
-      done: "Штатная команда завершилась, состояние регистрации, служб и доступность Ивы проверены.",
+      done: job.registryFingerprint
+        ? "Изменение завершено. Проверены весь список плагинов, службы, файлы сборки и доступность Ивы."
+        : "Задача завершена прежней версией Panels. Полная проверка соседних плагинов тогда не выполнялась.",
       failed:
         "Команда не выполнена: состояние или предложение изменилось. Проверьте карточку перед новым выбором.",
       uncertain:
         "Результат полностью не подтверждён. Команда автоматически не повторяется; проверьте регистрацию, службы и версию Ивы.",
+    };
+    const issues: Record<NonNullable<Job["issue"]>, string> = {
+      registry_changed:
+        "Менеджер изменил другой плагин или его регистрацию. Управление остановлено до проверки оператора. Автоматического отката не было.",
+      services_failed:
+        "Одна из служб плагинов или юзербот не прошла проверку. Дальнейшее управление остановлено до проверки оператора.",
+      artifacts_missing:
+        "В текущей сборке отсутствуют необходимые файлы плагинов. Дальнейшее управление остановлено до проверки оператора.",
+      manager_failed: "Менеджер не подтвердил успешное завершение команды.",
+      unsupported_manager:
+        "Эта версия менеджера Ивы не поддержана. Команда не запускалась; ядро не изменялось.",
+      preflight_failed:
+        "Проверка перед запуском не прошла. Команда не выполнялась; проверьте состояние плагинов и служб.",
     };
     const overdue =
       ["queued", "running"].includes(job.phase) &&
       this.now() - (job.started ?? job.submitted ?? job.created) > 16 * 60_000;
     return {
       title: `Управление · ${job.name}`,
-      body: `${job.target ? "Включение" : "Выключение"} плагина\n\n${overdue ? "Задача не завершилась в ожидаемый срок. Нужна проверка оператора; команда не повторяется." : messages[job.phase]}`,
+      body: `${job.target ? "Включение" : "Выключение"} плагина\n\n${job.issue ? issues[job.issue] + (job.affected?.length ? " Плагины: " + job.affected.join(", ") : "") + "\n\n" : ""}${overdue ? "Задача не завершилась в ожидаемый срок. Нужна проверка оператора; команда не повторяется." : messages[job.phase]}`,
       rows: [
         [{ id: `life:status:${job.id}`, label: "Проверить результат" }],
         [
@@ -260,6 +304,9 @@ export class Lifecycle {
         job.cli !== this.config.cli ||
         !entry ||
         fingerprint(entry) !== job.fingerprint ||
+        !job.registryFingerprint ||
+        registryFingerprint(await registered(this.data)) !==
+          job.registryFingerprint ||
         !entry.trusted ||
         entry.name === "iva-panels"
       ) {
@@ -270,7 +317,7 @@ export class Lifecycle {
       if (await this.busy())
         return {
           title: "Управление занято",
-          body: "Предыдущая задача ещё не завершена. Проверьте её результат; новое действие не запускалось.",
+          body: "Предыдущая задача требует завершения или проверки оператора. Проверьте её результат; новое действие не запускалось.",
           rows: [
             [
               { id: cardId(job.name), label: "О плагине" },
@@ -323,7 +370,7 @@ export class Lifecycle {
       const latest = await this.latest(entry.name);
       return {
         title: `Управление · ${entry.name}`,
-        body: `Сейчас: ${entry.enabled ? "включён" : "выключен"}\n\nШтатное изменение может пересобрать и перезапустить Иву. Выбор сначала покажет подтверждение. Файлы и настройки плагина не удаляются.`,
+        body: `Сейчас: ${entry.enabled ? "включён" : "выключен"}\n\nБудет выполнена полная штатная сборка той же версии Ивы без изменения её исходников. Возможен короткий перезапуск. Выбор сначала покажет подтверждение. Файлы и настройки плагина не удаляются.`,
         rows: [
           [
             {
@@ -343,7 +390,7 @@ export class Lifecycle {
     if (await this.busy())
       return {
         title: "Управление занято",
-        body: "Предыдущая задача ещё не завершена. Новый выбор не подготовлен.",
+        body: "Предыдущая задача требует завершения или проверки оператора. Новый выбор не подготовлен.",
         rows,
       };
     const now = this.now(),
@@ -353,6 +400,7 @@ export class Lifecycle {
         name: entry.name,
         target,
         fingerprint: fingerprint(entry),
+        registryFingerprint: registryFingerprint(await registered(this.data)),
         created: now,
         expires: now + 15 * 60_000,
         cli: this.config.cli,
@@ -361,7 +409,7 @@ export class Lifecycle {
     await saveJob(this.dir, job);
     return {
       title: `Подтверждение · ${entry.name}`,
-      body: `Сейчас: ${entry.enabled ? "включён" : "выключен"}\nПосле подтверждения: ${target ? "включён" : "выключен"}\nВерсия установки: ${installationPin(entry)!.slice(0, 12)}\n\nБудет выполнена штатная команда менеджера Ивы. Возможны пересборка и короткий перезапуск. Файлы и настройки не удаляются. Предложение действует 15 минут.`,
+      body: `Сейчас: ${entry.enabled ? "включён" : "выключен"}\nПосле подтверждения: ${target ? "включён" : "выключен"}\nВерсия установки: ${installationPin(entry)!.slice(0, 12)}\n\nШтатный менеджер выполнит полную сборку той же версии Ивы. Исходники ядра не меняются. Это может занять несколько минут; возможен короткий перезапуск. Файлы и настройки не удаляются. Предложение действует 15 минут.`,
       rows: [
         [
           { id: `life:confirm:${job.id}`, label: "Подтвердить" },

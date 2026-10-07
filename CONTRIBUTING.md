@@ -10,7 +10,7 @@ npm run check
 bash -n plugin/sh.iva/services/router/launch.sh
 ```
 
-Редактируйте TypeScript, затем пересобирайте `server.mjs` и `lifecycle-worker.mjs`. Сборка проверяется побайтово; ручное исправление bundle запрещено. CI проверяет сохранённый bundle без его предварительной перезаписи. Зависимости закреплены в lockfile, install-time скрипты не нужны сервису.
+Редактируйте TypeScript, затем пересобирайте `server.mjs`, `lifecycle-worker.mjs` и `native-manager.mjs`. Сборка проверяется побайтово; ручное исправление bundle запрещено. CI проверяет сохранённый bundle без его предварительной перезаписи. Зависимости закреплены в lockfile, install-time скрипты не нужны сервису.
 
 Изменение поведения требует согласования README, контрактов, документации и CHANGELOG. Для изменений повторов, доставки, прав и маршрутизации добавляйте регрессионные проверки. Не считайте unit-тесты проверкой полного Bridge или живого Telegram.
 
@@ -31,3 +31,5 @@ node scripts/check-bridge.mjs /path/to/isolated/iva-checkout
 Для изменения общего контракта проверяйте `node scripts/check-panel.ts examples/notes`, runtime validation и JSON Schema. Требования автору — [PLUGIN_API](docs/PLUGIN_API.md).
 
 Для lifecycle изменений запускайте `node scripts/check-lifecycle.mjs /path/to/isolated/iva-checkout`: штатные команды работают только с временным реестром, build/systemd/health подменены. Проверяйте queued/running перед эффектом, stale snapshot, отмену, повторы, частичный результат и отсутствие скрытого rollback. Настоящее Linux-переключение установки проверяется отдельно при нужном владельцу изменении.
+
+Для dev.10 запускайте также `node scripts/check-forced-build.mjs /path/to/isolated/iva-checkout`: он воспроизводит upstream reuse bug и проверяет настоящий native toggle dispatcher с force build hook. Исходники ядра не менять; тесты создают только временные данные.
