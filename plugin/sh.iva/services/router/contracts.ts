@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.1.0-dev.4";
+export const VERSION = "0.1.0-dev.5";
 export const PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
 export const TTL = 15 * 60_000;
@@ -78,7 +78,12 @@ export function render(view: View, screen: string, revision: number) {
         row.map((button) => ({
           text: button.label,
           callback_data: `${PREFIX}${screen}:${revision}:${index++}`,
-          ...(button.id === "close" ? { style: "danger" as const } : {}),
+          style:
+            button.id === "close" || button.id.startsWith("bitrix:cancel:")
+              ? ("danger" as const)
+              : button.id.startsWith("bitrix:confirm:")
+                ? ("success" as const)
+                : undefined,
         })),
       ),
     },
@@ -93,9 +98,15 @@ export const configSchema = z
     mode: z.enum(["passthrough", "panels"]).default("passthrough"),
     bitrixReadOnly: z.boolean().default(false),
     presentation: z.enum(["classic", "rich"]).default("classic"),
+    bitrixSettings: z.boolean().default(false),
   })
   .strict()
   .superRefine((c, ctx) => {
+    if (c.bitrixSettings && !c.bitrixReadOnly)
+      ctx.addIssue({
+        code: "custom",
+        message: "bitrixSettings requires bitrixReadOnly",
+      });
     const u = new URL(c.upstream);
     if (
       u.protocol !== "http:" ||

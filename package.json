@@ -1,10 +1,10 @@
 {
   "name": "iva-panels",
-  "version": "0.1.0-dev.4",
+  "version": "0.1.0-dev.5",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Read-only interactive Telegram panels for Iva plugins; experimental local Bridge middleware.",
+  "description": "Interactive Telegram panels for Iva plugins with explicitly enabled Bitrix24 settings preview and confirmation.",
   "engines": {
     "node": "24.x"
   },

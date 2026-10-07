@@ -15,7 +15,7 @@ flowchart LR
     P --> I[(Реестр плагинов Ивы)]
     P -->|Явный opt-in| C[Отдельный stdio MCP client]
     C --> X[Установленный Bitrix24
-только settings и diagnostics]
+settings и diagnostics]
     S --> A[Telegram Bot API
 sendMessage / editMessageText]
     A --> T
@@ -38,7 +38,7 @@ sequenceDiagram
     R->>S: собственное событие
     S->>D: прочитать экран и квитанции
     S->>S: сообщение, ревизия, TTL, повтор
-    S->>P: получить read-only представление
+    S->>P: получить представление
     S->>D: сохранить следующую ревизию и editing
     S->>T: editMessageText сохранённого вида
     T-->>S: результат
@@ -70,3 +70,7 @@ sequenceDiagram
 Durable inbox объединяет быстрые сообщения в `message.iva_parts`. Router проверяет все части: собственные обрабатываются по отдельности, обычные отправляются Eve с первоначальным maximum update ID и queue receipt. Смешанная пачка получает итоговую квитанцию от Eve после обработки собственных частей. При отказе downstream повтор не создаёт лишний экран: hash владельца/чата/message ID/текста переживает перегруппировку inbox. Для batch квитанций ключ включает update ID, индекс и hash; index может сдвинуться после частичного durable ack.
 
 Чтение прежнего dev.1 state поддержано; dev.1 не понимает новые batch keys. После первого batch не откатывайте бинарник на dev.1 с тем же state. Существующий порог вытеснения update ID и ограниченная глубина квитанций сохраняются; это не вечная история идемпотентности.
+
+## Изменение локальной политики Bitrix24
+
+Явный opt-in добавляет prepare/confirm/cancel к существующему settings tool. Engine сохраняет acting до вызова provider, затем сохраняет view/revision/editing и доставляет его. Reply выводится из сохранённой кнопки; preview UUID не передаётся в callback_data. Повтор editing доставляет только view. Повтор acting читает текущие настройки через recover и не вызывает действие снова. Формат старых экранов читается, но старый бинарник не понимает acting phase. [ADR 0003](adr/0003-confirmed-bitrix-settings.md).

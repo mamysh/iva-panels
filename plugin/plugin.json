@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "iva-panels",
-  "version": "0.1.0-dev.4",
-  "description": "Experimental Telegram panels with opt-in read-only Bitrix24 settings and diagnostics. Requires explicit Bridge routing configuration.",
+  "version": "0.1.0-dev.5",
+  "description": "Experimental Telegram panels with opt-in Bitrix24 settings editing through preview and confirmation. Requires explicit Bridge routing configuration.",
   "extensions": {
     "sh.iva": {}
   }

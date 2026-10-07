@@ -19,7 +19,7 @@ const receipt = z
   .object({
     hash: z.string().regex(/^[a-f0-9]{64}$/),
     screen: z.string().regex(/^[a-f0-9]{24}$/),
-    phase: z.enum(["sending", "editing", "done", "uncertain"]),
+    phase: z.enum(["sending", "acting", "editing", "done", "uncertain"]),
   })
   .strict();
 export const stateSchema = z

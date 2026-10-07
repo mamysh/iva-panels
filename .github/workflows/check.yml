@@ -5,6 +5,22 @@ on:
 permissions:
   contents: read
 jobs:
+  settings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          repository: mamysh/iva-bitrix24
+          ref: 010193e56e595d030267a49558e7ca4ff427bbde
+          path: compat-bitrix
+          persist-credentials: false
+      - run: node scripts/check-settings.ts compat-bitrix/plugin
   check:
     runs-on: ubuntu-latest
     steps:
@@ -41,4 +57,10 @@ jobs:
           persist-credentials: false
       - run: npm ci
         working-directory: compat-core
-      - run: node scripts/check-bridge.mjs compat-core
+      - uses: actions/checkout@v4
+        with:
+          repository: mamysh/iva-bitrix24
+          ref: 010193e56e595d030267a49558e7ca4ff427bbde
+          path: compat-bitrix
+          persist-credentials: false
+      - run: node scripts/check-bridge.mjs compat-core compat-bitrix/plugin

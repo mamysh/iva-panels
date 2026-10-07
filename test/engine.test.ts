@@ -123,6 +123,72 @@ test("one send then same-message edits with back and close", async (t) => {
   assert(f.calls.slice(1).every((c) => c.message === 100));
   assert.deepEqual(f.calls.at(-1)?.payload.reply_markup.inline_keyboard, []);
 });
+test("mutation intent is durable before dispatch; failed delivery and duplicate do not repeat effect", async (t) => {
+  const f = await fixture(t);
+  let effects = 0;
+  const provider = f.engine.provider;
+  const original = provider.page.bind(provider);
+  provider.isMutation = (id) => id === "details";
+  provider.recover = async () => details;
+  provider.page = async (id) => {
+    if (id === "details") {
+      const state = await f.store.load();
+      assert.equal(state.events["2"].phase, "acting");
+      effects++;
+    }
+    return original(id);
+  };
+  await f.engine.handle(event(1, "/panels"));
+  const click = event(
+    2,
+    f.calls[0].payload.reply_markup.inline_keyboard[0][0].callback_data,
+    100,
+  );
+  await f.engine.handle(event(8, click.message.text, 100, 99));
+  await f.engine.handle(event(9, click.message.text, 999));
+  assert.equal(effects, 0);
+  f.editFailure(true);
+  await assert.rejects(f.engine.handle(click));
+  f.editFailure(false);
+  await f.fresh().handle(click);
+  await f.fresh().handle(click);
+  assert.equal(effects, 1);
+  assert.equal((await f.store.load()).events["2"].phase, "done");
+});
+test("crash after mutation but before saving view recovers by reading, never replays mutation", async (t) => {
+  const f = await fixture(t);
+  let effects = 0,
+    reads = 0;
+  f.engine.provider.isMutation = (id) => id === "details";
+  const original = f.engine.provider.page.bind(f.engine.provider);
+  f.engine.provider.page = async (id) => {
+    if (id === "details") effects++;
+    return original(id);
+  };
+  f.engine.provider.recover = async () => {
+    reads++;
+    return { ...details, body: "Результат прерванного запроса не подтверждён" };
+  };
+  await f.engine.handle(event(1, "/panels"));
+  const click = event(
+    2,
+    f.calls[0].payload.reply_markup.inline_keyboard[0][0].callback_data,
+    100,
+  );
+  const save = f.store.save.bind(f.store);
+  f.store.save = async (state) => {
+    if (state.events["2"]?.phase === "editing")
+      throw new Error("synthetic crash");
+    return save(state);
+  };
+  await assert.rejects(f.engine.handle(click));
+  assert.equal((await f.store.load()).events["2"].phase, "acting");
+  f.store.save = save;
+  await f.fresh().handle(click);
+  assert.equal(effects, 1);
+  assert.equal(reads, 1);
+  assert.equal((await f.store.load()).events["2"].phase, "done");
+});
 test("duplicate command remains single-send across restart", async (t) => {
   const f = await fixture(t);
   await f.engine.handle(event(1, "/panels"));

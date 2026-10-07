@@ -1,6 +1,13 @@
 // Optional integration check against an independently installed stock Iva checkout.
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  writeFile,
+  readFile,
+  copyFile,
+  rm,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -464,6 +471,70 @@ createInterface({input:process.stdin}).on('line', line => {
   }
   assert(rich.includes("Панель закрыта"));
   assert.equal(calls.filter((c) => c.method === "sendRichMessage").length, 1);
+  if (process.argv[3]) {
+    await stopService();
+    await copyFile(
+      join(resolve(process.argv[3]), "server.mjs"),
+      join(bitrixRoot, "server.mjs"),
+    );
+    await copyFile(
+      join(resolve(process.argv[3]), "plugin.json"),
+      join(bitrixRoot, "plugin.json"),
+    );
+    const bitrixData = join(directory, "plugin-data/bitrix24-read");
+    await mkdir(bitrixData, { recursive: true, mode: 0o700 });
+    config.bitrixSettings = true;
+    await writeFile(join(panels, "config.json"), JSON.stringify(config), {
+      mode: 0o600,
+    });
+    await startService();
+    const settingsMessage = nextMessage;
+    await accept(message("/panels"));
+    await promote();
+    rich = calls.filter((c) => c.method === "sendRichMessage").at(-1).body
+      .rich_message.html;
+    const settingsTap = async (label) => {
+      const event = tap(richButton(label), settingsMessage);
+      await accept(event);
+      await promote();
+      rich = calls
+        .filter(
+          (c) =>
+            c.method === "editMessageText" &&
+            c.body.message_id === settingsMessage,
+        )
+        .at(-1).body.rich_message.html;
+      return event;
+    };
+    await settingsTap("Bitrix24");
+    await settingsTap("Данные");
+    await settingsTap("Рабочий профиль");
+    assert(rich.includes("После подтверждения:"));
+    await assert.rejects(readFile(join(bitrixData, "settings.json")), {
+      code: "ENOENT",
+    });
+    await settingsTap("Отменить");
+    await assert.rejects(readFile(join(bitrixData, "settings.json")), {
+      code: "ENOENT",
+    });
+    await settingsTap("Данные");
+    await settingsTap("Рабочий профиль");
+    const confirm = await settingsTap("Подтвердить");
+    assert(rich.includes("Настройки сохранены"));
+    const state = JSON.parse(
+      await readFile(join(bitrixData, "settings.json"), "utf8"),
+    );
+    assert.equal(state.revision, 1);
+    assert.equal(state.policy.people, "work");
+    await accept(confirm);
+    await promote();
+    assert.equal(
+      JSON.parse(await readFile(join(bitrixData, "settings.json"), "utf8"))
+        .revision,
+      1,
+    );
+    await settingsTap("Закрыть");
+  }
   console.log(
     "Bridge integration passed",
     execFileSync("git", ["-C", core, "rev-parse", "HEAD"], {
