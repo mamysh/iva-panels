@@ -18,6 +18,11 @@ flowchart LR
     P -->|Явный opt-in| C[Отдельный stdio MCP client]
     C --> X[Установленный Bitrix24
 settings и diagnostics]
+    P -->|lifecycle opt-in| L[Превью и приватный журнал задач]
+    L --> W[Отдельная systemd worker unit]
+    W --> N[Штатный CLI enable / disable]
+    N --> U[Реестр, службы и сборка Ивы]
+    W --> H[Проверка версии, служб и health]
     P --> F[File-delivery manifest и правила]
     F -->|Проверить stable| G[Публичный GitHub GET
 fixed repo и pinned SHA]
@@ -83,3 +88,7 @@ Durable inbox объединяет быстрые сообщения в `message
 ## Панель отправки файлов
 
 `files.ts` читает ограниченный manifest и показывает правила известного выпуска. Подстраницы `files:rules/updates/check` разрешены только для включённого и доверенного file-delivery. Только check обращается к фиксированному GitHub без credentials: stable commit → manifest по SHA → последний push ci.yml по SHA. Он не вызывает штатный updater и не затрагивает update offer. Установка остаётся в обычном диалоге Ивы.
+
+## Управление плагинами
+
+Встроенный lifecycle provider работает независимо от descriptor. Engine сохраняет acting и ID действия до provider. Confirm сохраняет queued до systemd-run; worker сохраняет running до CLI. Поэтому сбой engine восстанавливает только чтение результата, а CLI переживает рестарт Eve/Router. Ни delivery retry, ни кнопка проверки результата не повторяют команду. Статусы и пределы описаны в [ADR0006](adr/0006-native-lifecycle.md). Shared screen state читает только Router; worker меняет отдельный job файл. Update/downgrade исключает pending задачи.

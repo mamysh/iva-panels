@@ -6,6 +6,7 @@ import { Engine } from "./engine.ts";
 import { installedPanels } from "./providers.ts";
 import { telegram } from "./telegram.ts";
 import { createRouter } from "./router.ts";
+import { Lifecycle } from "./lifecycle.ts";
 async function start() {
   const data = process.env.PLUGIN_DATA;
   const ivaData = process.env.IVA_DATA_DIR;
@@ -28,6 +29,11 @@ async function start() {
       config.bitrixReadOnly,
       undefined,
       config.bitrixSettings,
+      undefined,
+      undefined,
+      config.lifecycle
+        ? new Lifecycle(ivaData, data, config.lifecycle)
+        : undefined,
     ),
     telegram(config.botToken, config.presentation),
   );

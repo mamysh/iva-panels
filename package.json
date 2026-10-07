@@ -1,10 +1,10 @@
 {
   "name": "iva-panels",
-  "version": "0.1.0-dev.7",
+  "version": "0.1.0-dev.8",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "Telegram plugin catalog and declarative panels for Iva, with Bitrix24 settings preview and confirmation.",
+  "description": "Telegram plugin catalog and panels for Iva, with opt-in settings and native enable/disable.",
   "engines": {
     "node": "24.x"
   },

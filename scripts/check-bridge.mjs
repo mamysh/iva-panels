@@ -478,6 +478,7 @@ createInterface({input:process.stdin}).on('line', line => {
 
   await stopService();
   config.presentation = "rich";
+  config.lifecycle = { cli: join(directory, "iva.mjs") };
   await writeFile(join(panels, "config.json"), JSON.stringify(config), {
     mode: 0o600,
   });
@@ -507,6 +508,10 @@ createInterface({input:process.stdin}).on('line', line => {
     "Обновления",
     "Проверить stable",
     "Отправка файлов",
+    "Управление плагином",
+    "Выключить плагин",
+    "Отменить",
+    "О плагине",
     "К плагинам",
     "offline · выключен",
     "К плагинам",
@@ -526,6 +531,8 @@ createInterface({input:process.stdin}).on('line', line => {
           c.method === "editMessageText" && c.body.message_id === richMessage,
       )
       .at(-1).body.rich_message.html;
+    if (label === "Отменить")
+      assert(rich.includes("Команда менеджеру не отправлялась"));
     if (label === "Details") assert(rich.includes("Contract details"));
     if (label === "offline · выключен")
       assert(rich.includes("Состояние: выключен"));

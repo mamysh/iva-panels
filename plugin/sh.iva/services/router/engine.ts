@@ -80,9 +80,10 @@ export class Engine {
         const screen = state.screens[prior.screen];
         if (!screen || !this.provider.recover)
           throw new Error("ACTION_RECOVERY_REQUIRED");
-        screen.view = viewSchema.parse(await this.provider.recover());
+        screen.view = viewSchema.parse(
+          await this.provider.recover(screen.page),
+        );
         screen.revision++;
-        screen.page = "bitrix24-read";
         prior.phase = "editing";
         await this.store.save(state);
         await this.deliver(state, previousKey!);
@@ -175,6 +176,7 @@ export class Engine {
     const close = button.id === "close";
     const mutation = this.provider.isMutation?.(button.id) ?? false;
     if (mutation) {
+      screen.page = button.id;
       state.events[key] = { hash, screen: action.screen, phase: "acting" };
       await this.store.save(state);
     }
@@ -184,7 +186,7 @@ export class Engine {
         selected = await this.provider.page(button.id);
       } catch (error) {
         if (!mutation || !this.provider.recover) throw error;
-        selected = await this.provider.recover();
+        selected = await this.provider.recover(button.id);
       }
     }
     const view = close

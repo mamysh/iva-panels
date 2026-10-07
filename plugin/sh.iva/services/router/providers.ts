@@ -21,6 +21,7 @@ import {
   definitionPage,
   basicCard,
 } from "./catalog.ts";
+import { Lifecycle, isLifecycleMutation } from "./lifecycle.ts";
 const titles: Record<string, string> = {
   "bitrix24-read": "Bitrix24",
   "file-delivery": "Отправка файлов",
@@ -35,7 +36,7 @@ const PAGE_SIZE = 5;
 export interface Provider {
   page(id: string): Promise<View>;
   isMutation?(id: string): boolean;
-  recover?(): Promise<View>;
+  recover?(id?: string): Promise<View>;
 }
 export function installedPanels(
   data: string,
@@ -44,10 +45,24 @@ export function installedPanels(
   bitrixSettings = false,
   changeBitrix: BitrixChange = bitrixChanger(data),
   checkFiles: FileCheck = fileUpdateCheck(),
+  lifecycle?: Lifecycle,
 ): Provider {
   const provider: Provider = {
-    isMutation: (id) => isBitrixChange(id),
-    async recover() {
+    isMutation: (id) => isBitrixChange(id) || isLifecycleMutation(id),
+    async recover(id) {
+      if (id?.startsWith("life:"))
+        return lifecycle
+          ? lifecycle.recover(id)
+          : {
+              title: "Управление выключено",
+              body: "Команда повторно не выполнялась.",
+              rows: [
+                [
+                  { id: "home", label: "К плагинам" },
+                  { id: "close", label: "Закрыть" },
+                ],
+              ],
+            };
       let page: View;
       try {
         page = await provider.page("bitrix24-read");
@@ -72,6 +87,36 @@ export function installedPanels(
       const plugins = registry.parse(
         await smallJson(join(data, "custom/plugins.json"), 5 * 1024 * 1024),
       ).plugins;
+      if (id.startsWith("life:")) {
+        if (!lifecycle)
+          return {
+            title: "Управление выключено",
+            body: "Управление запуском через Panels не настроено.",
+            rows: [
+              [
+                { id: "home", label: "К плагинам" },
+                { id: "close", label: "Закрыть" },
+              ],
+            ],
+          };
+        return lifecycle.page(id);
+      }
+      const manage = (view: View, name: string): View =>
+        lifecycle
+          ? {
+              ...view,
+              rows: [
+                ...view.rows.slice(0, -1),
+                [
+                  {
+                    id: `life:open:${pluginKey(name)}`,
+                    label: "Управление плагином",
+                  },
+                ],
+                ...view.rows.slice(-1),
+              ],
+            }
+          : view;
       const navigation = [
         { id: "home", label: "К плагинам" },
         { id: "close", label: "Закрыть" },
@@ -132,7 +177,7 @@ export function installedPanels(
           definition?.pages.some((page) => page.id === generic[3])
         )
           return definitionPage(p.name, definition, generic[3]);
-        return basicCard(p, metadata, definition);
+        return manage(basicCard(p, metadata, definition), p.name);
       }
       const name = id.startsWith("bitrix:")
         ? "bitrix24-read"
@@ -142,10 +187,15 @@ export function installedPanels(
       const plugin = plugins.find((p) => p.name === name);
       if (!plugin) throw new Error("PLUGIN_UNAVAILABLE");
       if (!plugin.enabled || !plugin.trusted)
-        return basicCard(plugin, await pluginMetadata(data, plugin));
+        return manage(
+          basicCard(plugin, await pluginMetadata(data, plugin)),
+          plugin.name,
+        );
       if (!titles[name]) throw new Error("PLUGIN_UNAVAILABLE");
       if (name === "file-delivery")
-        return filePage(data, id, plugin.sha, checkFiles);
+        return id === name
+          ? manage(await filePage(data, id, plugin.sha, checkFiles), name)
+          : filePage(data, id, plugin.sha, checkFiles);
       if (isBitrixChange(id)) {
         if (!bitrixReadOnly || !bitrixSettings)
           return {
@@ -156,11 +206,9 @@ export function installedPanels(
         return bitrixChangePage(id, changeBitrix, readBitrix);
       }
       if (bitrixReadOnly && name === "bitrix24-read")
-        return bitrixPage(
-          id === name ? "home" : id.slice(7),
-          readBitrix,
-          bitrixSettings,
-        );
+        return id === name
+          ? manage(await bitrixPage("home", readBitrix, bitrixSettings), name)
+          : bitrixPage(id.slice(7), readBitrix, bitrixSettings);
       if (id !== name) {
         if (
           ![
@@ -177,11 +225,14 @@ export function installedPanels(
           rows: [navigation],
         };
       }
-      return {
-        title: titles[id],
-        body: `Включён: да\nДоверие: разрешено\nCommit: ${plugin.sha?.slice(0, 12) ?? "не указан"}\n\nПодключение к внешнему сервису: не проверено.\nПоказано состояние регистрации в Иве; права и настройки интеграции не изменяются.`,
-        rows: [[{ id, label: "Обновить сведения" }], navigation],
-      };
+      return manage(
+        {
+          title: titles[id],
+          body: `Включён: да\nДоверие: разрешено\nCommit: ${plugin.sha?.slice(0, 12) ?? "не указан"}\n\nПодключение к внешнему сервису: не проверено.\nПоказано состояние регистрации в Иве; права и настройки интеграции не изменяются.`,
+          rows: [[{ id, label: "Обновить сведения" }], navigation],
+        },
+        plugin.name,
+      );
     },
   };
   return provider;
