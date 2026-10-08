@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.1.0-dev.13";
+export const VERSION = "0.1.0";
 export const PREFIX = "iva_panels:";
 const LEGACY_PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
