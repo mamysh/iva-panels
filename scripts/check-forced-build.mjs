@@ -7,6 +7,8 @@ import {
   readFile,
   rm,
   realpath,
+  symlink,
+  unlink,
 } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -23,7 +25,9 @@ const stock = await import(
 const { fixtureRunner } = await import(
   pathToFileURL(join(core, "scripts/fixtures/version-update-harness.ts")).href
 );
-const home = await mkdtemp(join(tmpdir(), "panels-force-build-"));
+const home = await realpath(
+  await mkdtemp(join(tmpdir(), "panels-force-build-")),
+);
 try {
   const repo = join(home, "repo"),
     data = join(home, "data");
@@ -198,10 +202,96 @@ try {
       await mkdir(join(root, file, ".."), { recursive: true });
       await writeFile(join(root, file), await readFile(join(core, file)));
     }
+    await unlink(join(home, "current"));
+    await symlink(root, join(home, "current"));
     assert.equal(
       (await supportedManager(join(root, "bin/iva.mjs"), data)).home,
       await realpath(home),
     );
+    const manager = await supportedManager(join(root, "bin/iva.mjs"), data);
+    const serviceRuntime = createCliRuntime(manager.runtimeRoot);
+    const { pluginUnitPlan, reconcilePluginUnits } = await import(
+      pathToFileURL(join(core, "scripts/lib/plugin-units.ts")).href
+    );
+    await mkdir(join(root, "services/mcp-proxy"), { recursive: true });
+    await writeFile(
+      join(root, "services/mcp-proxy/serve.ts"),
+      "// old proxy\n",
+    );
+    const unitDir = join(home, "synthetic-units");
+    const plan = pluginUnitPlan({
+      plugins: [
+        {
+          name: "peer",
+          enabled: true,
+          trusted: true,
+          root: join(data, "custom/plugins/peer"),
+          data: join(data, "plugin-data/peer"),
+          mcp: [
+            { server: "api", port: 8730, tokenFile: join(data, "peer.token") },
+          ],
+          services: [],
+        },
+      ],
+      root: serviceRuntime.ROOT,
+      node: serviceRuntime.NODE,
+      nodeBinDir: serviceRuntime.NODE_BIN_DIR,
+      dataDir: data,
+      dataDirEnvironment: '"ASSISTANT_DATA_DIR=' + data + '"',
+    });
+    const checkStart = async () => {
+      const body = await readFile(join(unitDir, plan.units[0].unit), "utf8");
+      const cwd = body.match(/^WorkingDirectory=(.+)$/m)[1];
+      const entrypoint = body.match(
+        /"([^"\n]+\/services\/mcp-proxy\/serve.ts)"/,
+      )[1];
+      assert.equal(cwd, join(home, "current"));
+      assert.equal(
+        entrypoint,
+        join(home, "current/services/mcp-proxy/serve.ts"),
+      );
+      await realpath(cwd);
+      return readFile(entrypoint, "utf8");
+    };
+    const reconciled = reconcilePluginUnits({
+      plan,
+      unitDir,
+      systemd: {
+        activate: () => {},
+        restart: () => {},
+        disableNow: () => {},
+        daemonReload: () => {},
+        resetFailed: () => {},
+      },
+    });
+    assert.deepEqual(reconciled.failures, []);
+    assert.match(await checkStart(), /old proxy/);
+    // The generated unit is NOT rewritten after a flip or old-version pruning.
+    const next = join(home, "versions/0.4.12-5cf8f1963c82+cafebabe~3");
+    await mkdir(join(next, "services/mcp-proxy"), { recursive: true });
+    await writeFile(
+      join(next, "services/mcp-proxy/serve.ts"),
+      "// next proxy\n",
+    );
+    await unlink(join(home, "current"));
+    await symlink(next, join(home, "current"));
+    await assert.rejects(
+      supportedManager(join(root, "bin/iva.mjs"), data),
+      /UNSUPPORTED_LAYOUT/,
+    );
+    await rm(root, { recursive: true });
+    assert.match(await checkStart(), /next proxy/);
+    // Restore the fixture for the existing manager hash rejection.
+    await mkdir(join(root, "bin"), { recursive: true });
+    await writeFile(join(root, "bin/iva.mjs"), "// synthetic entry\n");
+    await mkdir(join(root, "scripts/lib"), { recursive: true });
+    await mkdir(join(root, "scripts/cli"), { recursive: true });
+    await writeFile(
+      join(root, "scripts/cli/plugin.ts"),
+      await readFile(join(core, "scripts/cli/plugin.ts")),
+    );
+    await unlink(join(home, "current"));
+    await symlink(root, join(home, "current"));
     await writeFile(
       join(root, "scripts/lib/version-update.ts"),
       "// changed manager\n",
@@ -212,7 +302,7 @@ try {
     );
   }
   console.log(
-    "Unchanged stock updater: reproduced MCP-only auto-drop; forced disable/enable preserved both plugins",
+    "Unchanged stock updater: reproduced MCP-only auto-drop; forced disable/enable preserved both plugins; MCP unit paths survived flip and pruning",
   );
 } finally {
   await rm(home, { recursive: true, force: true });

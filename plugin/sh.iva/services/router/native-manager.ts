@@ -30,7 +30,12 @@ export async function supportedManager(cli: string, data: string) {
     )
       throw new Error("UNSUPPORTED_MANAGER");
   }
-  return { root, home };
+  // Validate immutable code using its exact path, but keep generated services on
+  // the installation symlink so later flips and version pruning cannot break them.
+  const runtimeRoot = join(home, "current");
+  if ((await realpath(runtimeRoot)) !== root)
+    throw new Error("UNSUPPORTED_LAYOUT");
+  return { root, home, runtimeRoot };
 }
 // The unchanged stock updater already supports force and a pinned target. Never
 // resolve a newer release or alter the installation's update branch here.
@@ -116,14 +121,14 @@ export async function manage(
   if (!["enable", "disable"].includes(verb) || name === "iva-panels")
     throw new Error("INVALID_COMMAND");
   pluginName.parse(name);
-  const { root, home } = await supportedManager(cli, data);
+  const { root, home, runtimeRoot } = await supportedManager(cli, data);
   const { createCliRuntime } = await import(
     pathToFileURL(join(root, "scripts/cli/runtime.ts")).href
   );
   const { createPluginCommands } = await import(
     pathToFileURL(join(root, "scripts/cli/plugin.ts")).href
   );
-  const runtime = createCliRuntime(root);
+  const runtime = createCliRuntime(runtimeRoot);
   const { cmdPlugin } = createPluginCommands(runtime, {
     buildVersion: () => forceBuild(root, home),
   });
