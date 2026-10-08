@@ -79,7 +79,11 @@ function forward(
   if (body) upstream.end(body);
   else req.pipe(upstream);
 }
-export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
+export function createRouter(
+  config: Config,
+  engine: Pick<Engine, "handle">,
+  acknowledge: (id: string) => Promise<void> = async () => {},
+) {
   return createServer(async (req, res) => {
     if (req.url === "/health" && req.method === "GET") {
       res.writeHead(200, { "content-type": "application/json" });
@@ -114,6 +118,45 @@ export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
       } catch {
         forward(req, res, config.upstream, body);
         return;
+      }
+      // iva_* callbacks pass stock Bridge unchanged. Normalize only our own
+      // envelope; ownership, private chat, message and revision are still checked.
+      const callback = (input as { callback_query?: unknown } | null)
+        ?.callback_query;
+      let callbackId: string | undefined;
+      if (callback && typeof callback === "object") {
+        const tap = callback as {
+          id?: unknown;
+          data?: unknown;
+          from?: unknown;
+          message?: Record<string, unknown>;
+        };
+        if (
+          typeof tap.data === "string" &&
+          tap.data.startsWith("iva_panels:")
+        ) {
+          if (
+            typeof tap.id !== "string" ||
+            tap.id.length === 0 ||
+            tap.id.length > 256 ||
+            !tap.message ||
+            typeof tap.message !== "object"
+          ) {
+            res.writeHead(403);
+            res.end();
+            return;
+          }
+          callbackId = tap.id;
+          input = {
+            ...(input as Record<string, unknown>),
+            message: {
+              message_id: tap.message.message_id,
+              chat: tap.message.chat,
+              from: tap.from,
+              text: tap.data,
+            },
+          };
+        }
       }
       const raw = input as {
         message?: {
@@ -163,6 +206,7 @@ export function createRouter(config: Config, engine: Pick<Engine, "handle">) {
         if (!part.event.success) throw new Error("INVALID_PART");
         await engine.handle(part.event.data, batch ? part.index : undefined);
       }
+      if (callbackId) await acknowledge(callbackId).catch(() => {});
       const ordinary = parts.filter((message) => !owns(message?.text));
       if (batch && ordinary.length > 0) {
         // Keep the upstream queue receipt and maximum update ID, but only ordinary

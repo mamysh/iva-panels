@@ -4,7 +4,7 @@ import { configSchema } from "./contracts.ts";
 import { Store } from "./store.ts";
 import { Engine } from "./engine.ts";
 import { installedPanels } from "./providers.ts";
-import { telegram } from "./telegram.ts";
+import { telegram, acknowledgeCallback } from "./telegram.ts";
 import { createRouter } from "./router.ts";
 import { Lifecycle } from "./lifecycle.ts";
 async function start() {
@@ -37,7 +37,9 @@ async function start() {
     ),
     telegram(config.botToken, config.presentation),
   );
-  const server = createRouter(config, engine);
+  const server = createRouter(config, engine, (id) =>
+    acknowledgeCallback(config.botToken, id),
+  );
   server.on("error", () => {
     console.error("iva-panels: listener failed");
     process.exitCode = 1;

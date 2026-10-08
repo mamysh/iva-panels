@@ -259,6 +259,7 @@ try {
       message: {
         message_id: messageId,
         date: 1,
+        text: "Synthetic panel text must not be appended to callback data",
         from: { id: 424242, is_bot: true },
         chat: { id: 42, type: "private" },
       },
@@ -288,9 +289,9 @@ try {
   const click = tap(callback);
   await accept(click);
   await promote();
-  assert.equal(click.message.message_id, 1000);
-  assert.equal(click.message.from.id, 42);
-  assert.equal(click.callback_query, undefined);
+  assert.equal(click.callback_query.message.message_id, 1000);
+  assert.equal(click.callback_query.from.id, 42);
+  assert.equal(click.message, undefined);
   assert(
     calls.some(
       (c) =>
@@ -319,12 +320,13 @@ try {
   });
   await accept(tap(back));
   await promote();
-  assert.equal((await queue.loadQueue()).queues["42:"].length, 1);
+  // Reserved callbacks are delivered independently of a running model turn.
+  assert.equal((await queue.loadQueue()).queues["42:"]?.length ?? 0, 0);
   assert.equal(
     calls.filter(
       (c) => c.method === "editMessageText" && c.body.message_id === 1000,
     ).length,
-    1,
+    2,
   );
   status.setChatStatus("42:", { status: "idle", sessionId: "synthetic" });
   await main.drainReadyQueueHeads();
@@ -333,16 +335,15 @@ try {
   const newChoice = calls
     .filter((c) => c.method === "editMessageText" && c.body.message_id === 1000)
     .at(-1).body.reply_markup.inline_keyboard[0][0].callback_data;
-  status.setChatStatus("42:", { status: "running", sessionId: "synthetic" });
-  await accept(tap(newChoice));
-  await promote();
-  status.setChatStatus("42:", { status: "idle", sessionId: "synthetic" });
   failNextEdit = true;
-  await main.drainReadyQueueHeads();
-  assert.equal((await queue.loadQueue()).queues["42:"].length, 1);
+  const retryTap = tap(newChoice);
+  await accept(retryTap);
+  await promote();
   await stopService();
   await startService();
-  await main.drainReadyQueueHeads();
+  // The same durable callback can retry delivery, not the action.
+  await accept(structuredClone(retryTap));
+  await promote();
   assert.equal((await queue.loadQueue()).queues["42:"]?.length ?? 0, 0);
   assert.equal(queue.queueInFlight.size, 0);
   assert.equal(opens().length, 1);

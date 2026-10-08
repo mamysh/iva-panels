@@ -68,3 +68,14 @@ export function telegram(
     },
   };
 }
+
+// Ack is cosmetic, never a reason to replay an already processed action.
+export async function acknowledgeCallback(token: string, id: string) {
+  await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ callback_query_id: id }),
+    signal: AbortSignal.timeout(5000),
+    redirect: "error",
+  }).catch(() => {});
+}

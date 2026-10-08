@@ -5,20 +5,37 @@ import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
 import { pluginName } from "./catalog.ts";
-const sourceHashes = {
-  "scripts/lib/version-update.ts":
-    "65abf07fd303080e5a41b28149d8fb67fde0a1b67cea2064c35f93f4a2261090",
-  "scripts/cli/plugin.ts":
-    "1999e073129e13f71fa1bed476f946fe34fd4f29d12afa8db66459599c834b3a",
-};
-export function supportedVersion(name: string) {
-  return /^0\.4\.12-5cf8f1963c82(?:\+[a-f0-9]{8})?(?:~[1-9][0-9]*)?$/.test(
-    name,
+const managers = [
+  {
+    version: "0.4.12-5cf8f1963c82",
+    updater: "65abf07fd303080e5a41b28149d8fb67fde0a1b67cea2064c35f93f4a2261090",
+  },
+  {
+    version: "0.4.14-fa5586557f41",
+    updater: "10d6e8cb6ea8f2de30bdc075dbb51e6ad0bacede1a9ffd03b49ee896c778418e",
+  },
+];
+function managerFor(name: string) {
+  return managers.find(
+    (m) =>
+      name === m.version ||
+      new RegExp(
+        `^${m.version.replaceAll(".", "\\.")}(?:\\+[a-f0-9]{8})?(?:~[1-9][0-9]*)?$`,
+      ).test(name),
   );
+}
+export function supportedVersion(name: string) {
+  return managerFor(name) !== undefined;
 }
 export async function supportedManager(cli: string, data: string) {
   const root = dirname(dirname(await realpath(cli)));
-  if (!supportedVersion(basename(root))) throw new Error("UNSUPPORTED_MANAGER");
+  const manager = managerFor(basename(root));
+  if (!manager) throw new Error("UNSUPPORTED_MANAGER");
+  const sourceHashes = {
+    "scripts/lib/version-update.ts": manager.updater,
+    "scripts/cli/plugin.ts":
+      "1999e073129e13f71fa1bed476f946fe34fd4f29d12afa8db66459599c834b3a",
+  };
   const home = dirname(dirname(root));
   if ((await realpath(data)) !== (await realpath(join(home, "data"))))
     throw new Error("UNSUPPORTED_LAYOUT");

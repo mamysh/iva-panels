@@ -654,11 +654,9 @@ test("stock force-build generation suffixes retain compatibility without accepti
     fc.property(
       fc.integer({ min: 1, max: 1000000 }),
       fc.constant("62dbd973"),
-      (generation, overlay) => {
-        assert.equal(
-          supportedVersion(`0.4.12-5cf8f1963c82+${overlay}~${generation}`),
-          true,
-        );
+      fc.constantFrom("0.4.12-5cf8f1963c82", "0.4.14-fa5586557f41"),
+      (generation, overlay, pin) => {
+        assert.equal(supportedVersion(`${pin}+${overlay}~${generation}`), true);
       },
     ),
   );

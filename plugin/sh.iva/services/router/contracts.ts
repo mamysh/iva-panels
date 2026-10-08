@@ -1,6 +1,7 @@
 import { z } from "zod";
-export const VERSION = "0.1.0-dev.12";
-export const PREFIX = "ipanel:";
+export const VERSION = "0.1.0-dev.13";
+export const PREFIX = "iva_panels:";
+const LEGACY_PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
 export const TTL = 15 * 60_000;
 export const LIMITS = {
@@ -49,14 +50,20 @@ export const eventSchema = z
   .passthrough();
 export type Event = z.infer<typeof eventSchema>;
 export function parseAction(text: string) {
-  const m = /^ipanel:([a-f0-9]{24}):(0|[1-9]\d{0,8}):(0|[1-9]\d?)$/.exec(text);
+  const m =
+    /^(?:iva_panels|ipanel):([a-f0-9]{24}):(0|[1-9]\d{0,8}):(0|[1-9]\d?)$/.exec(
+      text,
+    );
   return m
     ? { screen: m[1], revision: Number(m[2]), index: Number(m[3]) }
     : null;
 }
 export function owns(text: unknown): boolean {
   return (
-    typeof text === "string" && (text === "/panels" || text.startsWith(PREFIX))
+    typeof text === "string" &&
+    (text === "/panels" ||
+      text.startsWith(PREFIX) ||
+      text.startsWith(LEGACY_PREFIX))
   );
 }
 export function escape(text: string): string {

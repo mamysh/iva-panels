@@ -191,8 +191,10 @@ try {
   const version = JSON.parse(
     await readFile(join(core, "package.json"), "utf8"),
   ).version;
-  if (version === "0.4.12") {
-    const root = join(home, "versions/0.4.12-5cf8f1963c82+deadbeef~2");
+  if (["0.4.12", "0.4.14"].includes(version)) {
+    const pin =
+      version === "0.4.14" ? "0.4.14-fa5586557f41" : "0.4.12-5cf8f1963c82";
+    const root = join(home, `versions/${pin}+deadbeef~2`);
     await mkdir(join(root, "bin"), { recursive: true });
     await writeFile(join(root, "bin/iva.mjs"), "// synthetic entry\n");
     for (const file of [

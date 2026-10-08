@@ -55,11 +55,13 @@ async function setup(
     botToken: "424242:synthetic",
     owners: [42],
   });
+  const seen: unknown[] = [];
   let handled = 0;
   const proxy = await listen(
     createRouter(config, {
-      async handle() {
+      async handle(event) {
         handled++;
+        seen.push(event);
         await handle();
       },
     }),
@@ -75,7 +77,7 @@ async function setup(
       headers: { "x-telegram-bot-api-secret-token": secret },
       body: JSON.stringify(value),
     });
-  return { proxy, calls, post, handled: () => handled };
+  return { proxy, calls, post, seen, handled: () => handled };
 }
 test("own command is handled without Eve turn", async (t) => {
   const f = await setup(t);
@@ -228,4 +230,58 @@ test("own-only batch dispatches each part and never reaches Eve", async (t) => {
   assert.equal(result.status, 204);
   assert.equal(f.handled(), 2);
   assert.equal(f.calls.length, 0);
+});
+
+function callback(
+  from = { id: 42, is_bot: false },
+  chat = { id: 42, type: "private" },
+  data = "iva_panels:" + "a".repeat(24) + ":0:0",
+) {
+  return {
+    update_id: 7,
+    callback_query: {
+      id: "synthetic-callback",
+      data,
+      from,
+      message: { message_id: 10, from: { id: 100, is_bot: true }, chat },
+    },
+  };
+}
+test("reserved callback envelope uses tapping owner and message, without an Eve turn", async (t) => {
+  const f = await setup(t);
+  const r = await f.post(callback());
+  assert.equal(r.status, 204);
+  assert.equal(f.handled(), 1);
+  assert.equal(f.calls.length, 0);
+  assert.deepEqual(f.seen[0], {
+    update_id: 7,
+    callback_query: callback().callback_query,
+    message: {
+      message_id: 10,
+      chat: { id: 42, type: "private" },
+      from: { id: 42, is_bot: false },
+      text: callback().callback_query.data,
+    },
+  });
+});
+test("raw callbacks reject foreign owner, group, bot and unauthenticated input", async (t) => {
+  const f = await setup(t);
+  for (const value of [
+    callback({ id: 43, is_bot: false }),
+    callback({ id: 42, is_bot: true }),
+    callback(undefined, { id: 42, type: "group" }),
+  ])
+    assert.equal((await f.post(value)).status, 403);
+  assert.equal(
+    (await f.post(callback(), undefined, "wrong-secret")).status,
+    403,
+  );
+  assert.equal(f.handled(), 0);
+});
+test("foreign callback is forwarded byte for byte", async (t) => {
+  const f = await setup(t);
+  const value = callback(undefined, undefined, "eve:other");
+  await f.post(value);
+  assert.equal(f.handled(), 0);
+  assert.equal(f.calls[0].body, JSON.stringify(value));
 });

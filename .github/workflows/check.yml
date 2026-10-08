@@ -42,6 +42,7 @@ jobs:
           [
             3ad563e42f4aec9d9b1cee8ab93026bf4c834288,
             5cf8f1963c8297e244655fa4f3dc6f1764030283,
+            fa5586557f41c3397e8068f1a994eb820606d35a,
           ]
     steps:
       - uses: actions/checkout@v4
