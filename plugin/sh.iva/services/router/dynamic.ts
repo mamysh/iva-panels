@@ -290,7 +290,18 @@ export class DynamicPanels {
                 : `dyn:prepare:${pluginKey(p.name)}:${screen.revision}:${b.action}`,
           })),
         ),
-        [{ id: dynamicReadId(p.name, d.entry), label: "Обновить раздел" }],
+        ...(screen.rows
+          .flat()
+          .some((button) => "target" in button && button.target === d.entry)
+          ? []
+          : [
+              [
+                {
+                  id: dynamicReadId(p.name, d.entry),
+                  label: "Обновить раздел",
+                },
+              ],
+            ]),
         [
           { id: cardId(p.name), label: "О плагине" },
           { id: "close", label: "Закрыть" },

@@ -25,6 +25,8 @@ let nextMessage = 1000;
 let failNextEdit = false;
 let child;
 let exited;
+let bitrixService;
+let bitrixExited;
 async function stopService() {
   if (child && child.exitCode === null && child.signalCode === null) {
     child.kill("SIGTERM");
@@ -500,7 +502,9 @@ createInterface({input:process.stdin}).on('line', line => {
         /<tg-button\b[^>]*data="([^"]+)"[^>]*>([^<]+)<\/tg-button>/g,
       ),
     ];
-    return buttons.find((m) => m[2] === label)[1];
+    const found = buttons.find((m) => m[2] === label);
+    assert(found, `Missing button ${label}: ${rich}`);
+    return found[1];
   };
   for (const label of [
     "Bitrix24",
@@ -723,6 +727,111 @@ createInterface({input:process.stdin}).on('line', line => {
     "ordinary after generic settings",
   );
   await dynamicTap("Закрыть");
+  // Actual Bitrix v2 settings through the same stock Bridge and bundled Router.
+  if (process.argv[3]) {
+    let definition;
+    try {
+      definition = JSON.parse(
+        await readFile(join(resolve(process.argv[3]), "panels.json"), "utf8"),
+      );
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (definition) {
+      await copyFile(
+        join(resolve(process.argv[3]), "panels.json"),
+        join(bitrixRoot, "panels.json"),
+      );
+      const bitrixData = join(directory, "plugin-data/bitrix24-read");
+      const reserveBitrix = createServer();
+      await new Promise((r) => reserveBitrix.listen(0, "127.0.0.1", r));
+      const bitrixPort = reserveBitrix.address().port;
+      await new Promise((r) => reserveBitrix.close(r));
+      bitrixService = spawn(
+        process.execPath,
+        [join(resolve(process.argv[3]), "sh.iva/services/panels/server.mjs")],
+        {
+          env: {
+            PATH: process.env.PATH,
+            IVA_DATA_DIR: directory,
+            PLUGIN_DATA: bitrixData,
+            IVA_SERVICE_PORT: String(bitrixPort),
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
+      bitrixService.stdout.resume();
+      bitrixService.stderr.resume();
+      bitrixExited = once(bitrixService, "exit");
+      for (let attempt = 0; ; attempt++) {
+        try {
+          assert.equal(
+            (await network(`http://127.0.0.1:${bitrixPort}/health`)).status,
+            200,
+          );
+          break;
+        } catch (error) {
+          if (attempt >= 100 || bitrixService.exitCode !== null) throw error;
+          await new Promise((r) => setTimeout(r, 25));
+        }
+      }
+      const bitrixPolicy = async () =>
+        JSON.parse(await readFile(join(bitrixData, "settings.json"), "utf8"));
+      const v2Message = nextMessage;
+      await accept(message("/panels"));
+      await promote();
+      rich = calls.filter((c) => c.method === "sendRichMessage").at(-1).body
+        .rich_message.html;
+      const v2Tap = async (label) => {
+        const event = tap(richButton(label), v2Message);
+        await accept(event);
+        await promote();
+        rich = calls
+          .filter(
+            (c) =>
+              c.method === "editMessageText" && c.body.message_id === v2Message,
+          )
+          .at(-1).body.rich_message.html;
+        return event;
+      };
+      await v2Tap("Bitrix24");
+      await v2Tap("Настройки");
+      await v2Tap("Данные сотрудников");
+      await v2Tap("Разрешить email");
+      assert(rich.includes("После подтверждения:"));
+      assert.equal((await bitrixPolicy()).revision, 1);
+      assert.equal((await bitrixPolicy()).policy.email, false);
+      await v2Tap("Отменить");
+      assert.equal((await bitrixPolicy()).revision, 1);
+      await v2Tap("О плагине");
+      await v2Tap("Настройки");
+      await v2Tap("Данные сотрудников");
+      await v2Tap("Разрешить email");
+      const bitrixConfirm = await v2Tap("Подтвердить");
+      assert(rich.includes("Настройки сохранены"));
+      assert.equal((await bitrixPolicy()).revision, 2);
+      assert.equal((await bitrixPolicy()).policy.email, true);
+      await stopService();
+      await startService();
+      await accept(structuredClone(bitrixConfirm));
+      await promote();
+      assert.equal((await bitrixPolicy()).revision, 2);
+      await v2Tap("О плагине");
+      await v2Tap("Совместимая панель");
+      await v2Tap("Данные");
+      assert(rich.includes("разрешён"));
+      await v2Tap("Закрыть");
+      await accept(message("ordinary after Bitrix v2"));
+      await promote();
+      assert.equal(
+        JSON.parse(upstreamCalls.at(-1).body).message.text,
+        "ordinary after Bitrix v2",
+      );
+      console.log(
+        "Bitrix v2 Bridge integration passed: cancel/confirm/duplicate/router restart/shared legacy policy",
+      );
+    }
+  }
   console.log(
     "Bridge integration passed",
     execFileSync("git", ["-C", core, "rev-parse", "HEAD"], {
@@ -732,6 +841,14 @@ createInterface({input:process.stdin}).on('line', line => {
 } finally {
   globalThis.fetch = network;
   await stopService();
+  if (
+    bitrixService &&
+    bitrixService.exitCode === null &&
+    bitrixService.signalCode === null
+  ) {
+    bitrixService.kill("SIGTERM");
+    await bitrixExited;
+  }
   for (const server of servers) {
     server.closeAllConnections();
     await new Promise((r) => server.close(r));

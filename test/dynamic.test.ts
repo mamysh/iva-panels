@@ -446,3 +446,24 @@ test("card distinguishes settings-only, actions-only and combined capabilities",
     assert(!card.body.includes("Дополнительные разделы не подключены"));
   }
 });
+
+test("plugin navigation to entry does not duplicate the Router entry action", async (t) => {
+  const f = await fixture(t, async () => ({
+    state: "screen",
+    revision: 0,
+    title: "Plugin settings",
+    body: "Own home navigation",
+    rows: [[{ label: "Back to settings", target: "home" }]],
+  }));
+  const view = await f.provider.page(dynamicReadId(name, "home"));
+  assert.equal(view.body, "Own home navigation");
+  assert.equal(
+    view.rows
+      .flat()
+      .filter((button) => button.id === dynamicReadId(name, "home")).length,
+    1,
+  );
+  assert(
+    view.rows.flat().some((button) => button.label === "Back to settings"),
+  );
+});
