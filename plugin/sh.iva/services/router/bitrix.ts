@@ -75,7 +75,7 @@ function bitrixCall(data: string) {
     );
     if (
       manifest.name !== "bitrix24-read" ||
-      !["0.9.0-rc.1", "0.9.0-rc.2"].includes(manifest.version)
+      !["0.9.0-rc.1", "0.9.0-rc.2", "0.9.0"].includes(manifest.version)
     )
       throw new Error("BITRIX_VERSION_UNSUPPORTED");
     const path = join(data, "custom", "plugins", "bitrix24-read.env");

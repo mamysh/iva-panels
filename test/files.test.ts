@@ -46,6 +46,14 @@ test("file pages are local until explicit check; unknown version and malformed m
     (await filePage(data, "files:rules", old, check)).body,
     /50 МиБ/,
   );
+  await writeFile(
+    join(data, "custom/plugins/file-delivery/plugin.json"),
+    JSON.stringify({ name: "file-delivery", version: "0.3.3" }),
+  );
+  assert.match(
+    (await filePage(data, "files:rules", old, check)).body,
+    /50 МиБ/,
+  );
   await filePage(data, "files:check", old, check);
   assert.equal(calls, 1);
   const path = join(data, "custom/plugins/file-delivery/plugin.json");
