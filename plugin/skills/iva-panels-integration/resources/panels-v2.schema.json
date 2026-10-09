@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Iva Panels dynamic descriptor v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plugin", "pluginVersion", "entry", "capabilities"],
+  "properties": {
+    "schema": { "const": "iva-panels/v2" },
+    "plugin": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^(?!.*\\.\\.)(?!.*--)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$"
+    },
+    "pluginVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 48,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]*$"
+    },
+    "entry": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,23}$" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "enum": ["settings", "actions"] }
+    }
+  }
+}

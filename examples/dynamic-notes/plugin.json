@@ -1,0 +1,7 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "dynamic-notes-example",
+  "version": "1.0.0",
+  "description": "Synthetic standalone notes settings example for Panels v2.",
+  "extensions": { "sh.iva": {} }
+}

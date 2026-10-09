@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 export const PREFIX = "iva_panels:";
 const LEGACY_PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
@@ -88,10 +88,12 @@ export function render(view: View, screen: string, revision: number) {
           style:
             button.id === "close" ||
             button.id.startsWith("bitrix:cancel:") ||
-            button.id.startsWith("life:cancel:")
+            button.id.startsWith("life:cancel:") ||
+            button.id.startsWith("dyn:cancel:")
               ? ("danger" as const)
               : button.id.startsWith("bitrix:confirm:") ||
-                  button.id.startsWith("life:confirm:")
+                  button.id.startsWith("life:confirm:") ||
+                  button.id.startsWith("dyn:confirm:")
                 ? ("success" as const)
                 : undefined,
         })),
@@ -109,6 +111,7 @@ export const configSchema = z
     bitrixReadOnly: z.boolean().default(false),
     presentation: z.enum(["classic", "rich"]).default("classic"),
     bitrixSettings: z.boolean().default(false),
+    dynamicPanels: z.boolean().default(false),
     lifecycle: z
       .object({
         cli: z

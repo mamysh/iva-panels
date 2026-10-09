@@ -73,7 +73,10 @@ function bitrixCall(data: string) {
     const manifest = JSON.parse(
       await readFile(join(root, "plugin.json"), "utf8"),
     );
-    if (manifest.name !== "bitrix24-read" || manifest.version !== "0.9.0-rc.1")
+    if (
+      manifest.name !== "bitrix24-read" ||
+      !["0.9.0-rc.1", "0.9.0-rc.2", "0.9.0"].includes(manifest.version)
+    )
       throw new Error("BITRIX_VERSION_UNSUPPORTED");
     const path = join(data, "custom", "plugins", "bitrix24-read.env");
     let values: Record<string, string | undefined> = {};

@@ -6,6 +6,7 @@ import { Engine } from "./engine.ts";
 import { installedPanels } from "./providers.ts";
 import { telegram, acknowledgeCallback } from "./telegram.ts";
 import { createRouter } from "./router.ts";
+import { DynamicPanels } from "./dynamic.ts";
 import { Lifecycle } from "./lifecycle.ts";
 async function start() {
   const data = process.env.PLUGIN_DATA;
@@ -34,6 +35,7 @@ async function start() {
       config.lifecycle
         ? new Lifecycle(ivaData, data, config.lifecycle)
         : undefined,
+      config.dynamicPanels ? new DynamicPanels(ivaData, data) : undefined,
     ),
     telegram(config.botToken, config.presentation),
   );

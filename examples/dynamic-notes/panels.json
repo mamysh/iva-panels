@@ -1,0 +1,7 @@
+{
+  "schema": "iva-panels/v2",
+  "plugin": "dynamic-notes-example",
+  "pluginVersion": "1.0.0",
+  "entry": "home",
+  "capabilities": ["settings"]
+}

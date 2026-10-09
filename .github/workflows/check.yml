@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: mamysh/iva-bitrix24
-          ref: 010193e56e595d030267a49558e7ca4ff427bbde
+          ref: 60d690eeb302f951178d255fc687abbce4c020a9
           path: compat-bitrix
           persist-credentials: false
       - run: node scripts/check-settings.ts compat-bitrix/plugin
@@ -32,6 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: node scripts/check-panel.ts examples/notes
+      - run: node scripts/check-panel.ts examples/dynamic-notes
       - run: bash -n plugin/sh.iva/services/router/launch.sh
 
   bridge:
@@ -62,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: mamysh/iva-bitrix24
-          ref: 010193e56e595d030267a49558e7ca4ff427bbde
+          ref: 60d690eeb302f951178d255fc687abbce4c020a9
           path: compat-bitrix
           persist-credentials: false
       - run: node scripts/check-bridge.mjs compat-core compat-bitrix/plugin
