@@ -21,6 +21,13 @@ import {
   definitionPage,
   basicCard,
 } from "./catalog.ts";
+import {
+  DynamicPanels,
+  dynamicDefinition,
+  dynamicReadId,
+  isDynamicMutation,
+} from "./dynamic.ts";
+import { connectionPage, connectionStatus } from "./connection.ts";
 import { Lifecycle, isLifecycleMutation } from "./lifecycle.ts";
 const titles: Record<string, string> = {
   "bitrix24-read": "Bitrix24",
@@ -46,10 +53,31 @@ export function installedPanels(
   changeBitrix: BitrixChange = bitrixChanger(data),
   checkFiles: FileCheck = fileUpdateCheck(),
   lifecycle?: Lifecycle,
+  dynamic?: DynamicPanels,
 ): Provider {
   const provider: Provider = {
-    isMutation: (id) => isBitrixChange(id) || isLifecycleMutation(id),
+    isMutation: (id) =>
+      isBitrixChange(id) || isLifecycleMutation(id) || isDynamicMutation(id),
     async recover(id) {
+      if (id?.startsWith("dyn:")) {
+        const plugins = registry.parse(
+          await smallJson(join(data, "custom/plugins.json"), 5 * 1024 * 1024),
+        ).plugins;
+        const plugin = plugins.find(
+          (p) => pluginKey(p.name) === id.split(":")[2],
+        );
+        if (plugin && dynamic) return dynamic.recover(plugin);
+        return {
+          title: "Плагин недоступен",
+          body: "Запрос не повторяется. Проверьте результат у плагина.",
+          rows: [
+            [
+              { id: "home", label: "К плагинам" },
+              { id: "close", label: "Закрыть" },
+            ],
+          ],
+        };
+      }
       if (id?.startsWith("life:"))
         return lifecycle
           ? lifecycle.recover(id)
@@ -131,10 +159,7 @@ export function installedPanels(
           .slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
           .map((p) => [
             {
-              id:
-                titles[p.name] && p.enabled && p.trusted
-                  ? p.name
-                  : cardId(p.name),
+              id: cardId(p.name),
               label: `${(titles[p.name] ?? p.name).slice(0, 45)}${!p.enabled ? " · выключен" : !p.trusted ? " · без доверия" : ""}`,
             },
           ]);
@@ -157,6 +182,36 @@ export function installedPanels(
           ],
         };
       }
+      const external =
+        /^(dyn|connect):(?:([a-z]+):)?([a-f0-9]{24})(?::.*)?$/.exec(id);
+      if (external) {
+        const plugin = plugins.find((p) => pluginKey(p.name) === external[3]);
+        if (!plugin)
+          return {
+            title: "Плагин недоступен",
+            body: "Обновите список плагинов.",
+            rows: [navigation],
+          };
+        const metadata = await pluginMetadata(data, plugin);
+        if (external[1] === "connect")
+          return connectionPage(
+            plugin,
+            await connectionStatus(data, plugin, metadata?.version),
+            Boolean(dynamic),
+          );
+        const definition = await dynamicDefinition(
+          data,
+          plugin,
+          metadata?.version,
+        );
+        if (!definition || !dynamic)
+          return connectionPage(
+            plugin,
+            await connectionStatus(data, plugin, metadata?.version),
+            Boolean(dynamic),
+          );
+        return dynamic.page(id, plugin, definition);
+      }
       const generic =
         /^(plugin|panel):([a-f0-9]{24})(?::([a-z][a-z0-9-]{0,23}))?$/.exec(id);
       if (generic) {
@@ -177,7 +232,54 @@ export function installedPanels(
           definition?.pages.some((page) => page.id === generic[3])
         )
           return definitionPage(p.name, definition, generic[3]);
-        return manage(basicCard(p, metadata, definition), p.name);
+        const dynamicDescriptor = await dynamicDefinition(
+          data,
+          p,
+          metadata?.version,
+        );
+        const status = await connectionStatus(data, p, metadata?.version);
+        const card = basicCard(
+          p,
+          metadata,
+          definition,
+          dynamicDescriptor
+            ? `Плагин предоставляет общий API Panels. ${dynamic ? "Откройте раздел, чтобы проверить доступность." : "Доступ к API выключен оператором Panels."}`
+            : undefined,
+        );
+        card.title = titles[p.name] ?? card.title;
+        card.body += `\n\nСвязь с Panels: ${status.label}`;
+        card.rows.splice(
+          -2,
+          0,
+          ...(dynamicDescriptor && dynamic
+            ? [
+                [
+                  {
+                    id: dynamicReadId(p.name, dynamicDescriptor.entry),
+                    label:
+                      dynamicDescriptor.capabilities.length === 2
+                        ? "Настройки и действия"
+                        : dynamicDescriptor.capabilities[0] === "settings"
+                          ? "Настройки"
+                          : "Действия плагина",
+                  },
+                ],
+              ]
+            : []),
+          [
+            {
+              id: `connect:${pluginKey(p.name)}`,
+              label:
+                status.kind === "dynamic"
+                  ? "О подключении"
+                  : "Подключить к Panels",
+            },
+          ],
+          ...(titles[p.name] && p.enabled && p.trusted
+            ? [[{ id: p.name, label: "Совместимая панель" }]]
+            : []),
+        );
+        return manage(card, p.name);
       }
       const name = id.startsWith("bitrix:")
         ? "bitrix24-read"

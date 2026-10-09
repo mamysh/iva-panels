@@ -32,6 +32,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: node scripts/check-panel.ts examples/notes
+      - run: node scripts/check-panel.ts examples/dynamic-notes
       - run: bash -n plugin/sh.iva/services/router/launch.sh
 
   bridge:

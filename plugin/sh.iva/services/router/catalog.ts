@@ -180,10 +180,11 @@ export function basicCard(
   plugin: PluginEntry,
   metadata: Awaited<ReturnType<typeof pluginMetadata>>,
   definition?: PanelDefinition,
+  connectionText?: string,
 ): View {
   return {
     title: plugin.name,
-    body: `Версия: ${metadata?.version ?? plugin.version ?? "не удалось прочитать"}\nСостояние: ${plugin.enabled ? "включён" : "выключен"}\nДоверие: ${plugin.trusted ? "разрешено" : "не разрешено"}\nCommit: ${/^[a-f0-9]{40}$/.test(plugin.sha ?? "") ? plugin.sha!.slice(0, 12) : "не указан"}\n\n${metadata?.description ? metadata.description + "\n\n" : ""}${!plugin.enabled || !plugin.trusted ? "Собственные разделы доступны после включения и разрешения доверия через менеджер Ивы." : definition ? "Плагин предоставляет разделы для Panels." : "Дополнительные разделы не подключены или их описание несовместимо."}\nСтатус регистрации не подтверждает работу службы или внешнего сервиса.`,
+    body: `Версия: ${metadata?.version ?? plugin.version ?? "не удалось прочитать"}\nСостояние: ${plugin.enabled ? "включён" : "выключен"}\nДоверие: ${plugin.trusted ? "разрешено" : "не разрешено"}\nCommit: ${/^[a-f0-9]{40}$/.test(plugin.sha ?? "") ? plugin.sha!.slice(0, 12) : "не указан"}\n\n${metadata?.description ? metadata.description + "\n\n" : ""}${!plugin.enabled || !plugin.trusted ? "Собственные разделы доступны после включения и разрешения доверия через менеджер Ивы." : (connectionText ?? (definition ? "Плагин предоставляет разделы для Panels." : "Дополнительные разделы не подключены или их описание несовместимо."))}\nСтатус регистрации не подтверждает работу службы или внешнего сервиса.`,
     rows: [
       ...(definition
         ? [
