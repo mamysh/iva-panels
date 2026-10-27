@@ -19,6 +19,11 @@ import {
   supportedManager,
 } from "../plugin/sh.iva/services/router/native-manager.ts";
 const core = resolve(process.argv[2] || "");
+const version = JSON.parse(
+  await readFile(join(core, "package.json"), "utf8"),
+).version;
+const current = version === "0.5.7";
+
 const stock = await import(
   pathToFileURL(join(core, "scripts/lib/version-update.ts")).href
 );
@@ -143,8 +148,8 @@ try {
   assert.equal(reused.version, first.version);
   const dropped = JSON.parse(await readFile(registry, "utf8")).plugins;
   assert(
-    dropped.some((p) => !p.enabled),
-    "stock reuse must reproduce MCP-only auto-drop",
+    dropped.some((plugin) => !plugin.enabled),
+    "unchanged stock reuse still drops an MCP-only peer: the force-build workaround must remain",
   );
   // Real native toggle dispatcher wired to the Panels force callback.
   await put(both);
@@ -177,30 +182,76 @@ try {
     log: () => {},
     buildVersion: () => forceBuild(core, home, forced),
   });
+  const buildApi = await import(
+    pathToFileURL(join(core, "scripts/lib/plugin-build.ts")).href
+  );
+  const { createVersionStore } = await import(
+    pathToFileURL(join(core, "scripts/lib/version-store.ts")).href
+  );
+  async function assertComposition(enabled) {
+    const actual = JSON.parse(await readFile(registry, "utf8")).plugins;
+    assert.deepEqual(
+      actual,
+      both.map((entry, index) => ({ ...entry, enabled: enabled[index] })),
+      "target toggle must preserve all peer metadata",
+    );
+    const plugins = await buildApi.codePlugins(data);
+    assert.deepEqual(plugins.diagnostics, []);
+    assert.deepEqual(
+      plugins.plugins.map((plugin) => plugin.name).sort(),
+      both
+        .filter((_entry, index) => enabled[index])
+        .map((entry) => entry.name)
+        .sort(),
+    );
+    const running = createVersionStore(home).currentName();
+    assert(running);
+    assert.deepEqual(
+      buildApi.pluginsMissingArtifacts(
+        join(home, "versions", running),
+        plugins.plugins,
+      ),
+      [],
+      "all enabled peers must keep their built artifacts",
+    );
+  }
   await cmdPlugin(["disable", "files"]);
   assert.deepEqual(
     JSON.parse(await readFile(registry, "utf8")).plugins.map((p) => p.enabled),
     [false, true],
   );
+  await assertComposition([false, true]);
   await cmdPlugin(["enable", "files"]);
+  await assertComposition([true, true]);
   assert(builds >= 2, "each changed composition must get a fresh build");
   assert.deepEqual(
     JSON.parse(await readFile(registry, "utf8")).plugins.map((p) => p.enabled),
     [true, true],
   );
-  const version = JSON.parse(
-    await readFile(join(core, "package.json"), "utf8"),
-  ).version;
-  if (["0.4.12", "0.4.14"].includes(version)) {
-    const pin =
-      version === "0.4.14" ? "0.4.14-fa5586557f41" : "0.4.12-5cf8f1963c82";
+  if (["0.4.12", "0.4.14", "0.5.7"].includes(version)) {
+    const pin = current
+      ? "0.5.7-ae313753a1ae"
+      : version === "0.4.14"
+        ? "0.4.14-fa5586557f41"
+        : "0.4.12-5cf8f1963c82";
+    const sources = current
+      ? [
+          "scripts/cli/plugin.ts",
+          "scripts/cli/plugin-cli-context.ts",
+          "scripts/cli/plugin-cli-trust.ts",
+          "scripts/cli/runtime.ts",
+          "scripts/lib/plugin-core.ts",
+          "scripts/lib/version-update.ts",
+          "scripts/lib/version-store.ts",
+          "scripts/lib/plugin-build.ts",
+          "scripts/lib/plugin-units.ts",
+          "scripts/update-finish.ts",
+        ]
+      : ["scripts/lib/version-update.ts", "scripts/cli/plugin.ts"];
     const root = join(home, `versions/${pin}+deadbeef~2`);
     await mkdir(join(root, "bin"), { recursive: true });
     await writeFile(join(root, "bin/iva.mjs"), "// synthetic entry\n");
-    for (const file of [
-      "scripts/lib/version-update.ts",
-      "scripts/cli/plugin.ts",
-    ]) {
+    for (const file of sources) {
       await mkdir(join(root, file, ".."), { recursive: true });
       await writeFile(join(root, file), await readFile(join(core, file)));
     }
@@ -211,6 +262,23 @@ try {
       await realpath(home),
     );
     const manager = await supportedManager(join(root, "bin/iva.mjs"), data);
+    // Each pin must match the independently checked-out upstream file, and a
+    // changed delegated module must be refused before a command is available.
+    for (const file of sources) {
+      const original = await readFile(join(root, file));
+      await unlink(join(root, file));
+      await assert.rejects(
+        supportedManager(join(root, "bin/iva.mjs"), data),
+        /UNSUPPORTED_MANAGER/,
+      );
+      await writeFile(join(root, file), "// incompatible source\n");
+      await assert.rejects(
+        supportedManager(join(root, "bin/iva.mjs"), data),
+        /UNSUPPORTED_MANAGER/,
+      );
+      await writeFile(join(root, file), original);
+    }
+
     const serviceRuntime = createCliRuntime(manager.runtimeRoot);
     const { pluginUnitPlan, reconcilePluginUnits } = await import(
       pathToFileURL(join(core, "scripts/lib/plugin-units.ts")).href
@@ -269,7 +337,7 @@ try {
     assert.deepEqual(reconciled.failures, []);
     assert.match(await checkStart(), /old proxy/);
     // The generated unit is NOT rewritten after a flip or old-version pruning.
-    const next = join(home, "versions/0.4.12-5cf8f1963c82+cafebabe~3");
+    const next = join(home, `versions/${pin}+cafebabe~3`);
     await mkdir(join(next, "services/mcp-proxy"), { recursive: true });
     await writeFile(
       join(next, "services/mcp-proxy/serve.ts"),
@@ -283,15 +351,13 @@ try {
     );
     await rm(root, { recursive: true });
     assert.match(await checkStart(), /next proxy/);
-    // Restore the fixture for the existing manager hash rejection.
+    // Restore every pinned source after pruning; then tamper only the updater.
     await mkdir(join(root, "bin"), { recursive: true });
     await writeFile(join(root, "bin/iva.mjs"), "// synthetic entry\n");
-    await mkdir(join(root, "scripts/lib"), { recursive: true });
-    await mkdir(join(root, "scripts/cli"), { recursive: true });
-    await writeFile(
-      join(root, "scripts/cli/plugin.ts"),
-      await readFile(join(core, "scripts/cli/plugin.ts")),
-    );
+    for (const file of sources) {
+      await mkdir(join(root, file, ".."), { recursive: true });
+      await writeFile(join(root, file), await readFile(join(core, file)));
+    }
     await unlink(join(home, "current"));
     await symlink(root, join(home, "current"));
     await writeFile(
@@ -304,7 +370,7 @@ try {
     );
   }
   console.log(
-    "Unchanged stock updater: reproduced MCP-only auto-drop; forced disable/enable preserved both plugins; MCP unit paths survived flip and pruning",
+    `Unchanged stock ${version}: reuse reproduced MCP-only auto-drop; forced disable/enable preserved both plugins; exact source pins and MCP paths survived checks`,
   );
 } finally {
   await rm(home, { recursive: true, force: true });

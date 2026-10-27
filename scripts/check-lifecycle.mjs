@@ -86,6 +86,7 @@ try {
   const builds = [],
     effects = [];
   let version = 0;
+  let failBuild = false;
   const base = createCliRuntime(root);
   const runtime = {
     ...base,
@@ -102,6 +103,8 @@ try {
     log: () => {},
     buildVersion: async (options) => {
       builds.push(options.requirePlugins);
+      if (failBuild)
+        return { status: "failed", reason: "Synthetic build failure" };
       const target = join(root, `manager-${++version}.mjs`);
       await writeFile(target, "// isolated build marker\n");
       await unlink(cli);
@@ -172,8 +175,36 @@ try {
     ).version,
     "1.0.0",
   );
+
+  failBuild = true;
+  id = await prepare("disable");
+  await life.page(`life:confirm:${id}`);
+  assert.equal((await readJob(life.dir, id)).phase, "uncertain");
+  const beforeRetry = effects.length;
+  await runJob(
+    data,
+    panels,
+    id,
+    runner,
+    async () => true,
+    async () => true,
+    async () => true,
+    async () => true,
+  );
+  assert.equal(
+    effects.length,
+    beforeRetry,
+    "unknown build must never replay the command",
+  );
+  const blocked = await life.page(`life:prepare:${pluginKey("demo")}:enable`);
+  assert.match(blocked.body, /Предыдущая задача/);
+  assert(
+    !blocked.rows
+      .flat()
+      .some((button) => button.id.startsWith("life:confirm:")),
+  );
   console.log(
-    "Native manager lifecycle passed: cancel, disable, duplicate, enable; isolated build/systemd/health",
+    "Native manager lifecycle passed: cancel/disable/duplicate/enable, failed build stays uncertain without replay; isolated build/systemd/health",
   );
 } finally {
   await rm(root, { recursive: true, force: true });
