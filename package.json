@@ -1,6 +1,6 @@
 {
   "name": "iva-panels",
-  "version": "0.3.0-rc.2",
+  "version": "0.3.0-rc.3",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -15,9 +15,10 @@
     "format:check": "prettier --check .",
     "audit": "npm audit --audit-level=high",
     "check:privacy": "node scripts/privacy.ts",
-    "check": "npm run format:check && npm run typecheck && npm test && npm run check:bundle && npm run check:privacy && npm run audit",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run check:bundle && npm run check:privacy && npm run check:docs && npm run audit",
     "build": "node scripts/build.ts",
-    "check:bundle": "node scripts/build.ts --check"
+    "check:bundle": "node scripts/build.ts --check",
+    "check:docs": "node scripts/check-docs.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

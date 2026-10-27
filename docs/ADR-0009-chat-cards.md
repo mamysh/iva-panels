@@ -1,6 +1,8 @@
 # ADR 0009: plugin action cards in the owner chat
 
-Status: implemented candidate; live acceptance pending.
+Status: implemented in 0.3 RC. A live Bitrix24 chat-card scenario has passed on
+stock Iva 0.5.7. Clean installation and the full failure matrix remain separate
+acceptance steps; see [compatibility](COMPATIBILITY.md).
 
 The plugin catalog is an administration and recovery surface, not a required step in
 an ordinary business request. Plugins may ask Panels to present a verified v2 proposal

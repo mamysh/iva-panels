@@ -1,37 +1,90 @@
-# Разработка
+# Разработка Panels
 
-Требуется Node.js 24 и npm. Runtime ориентирован на Linux со штатной утилитой `flock`. Исходники сервиса находятся в `plugin/sh.iva/services/router`, тесты используют синтетические данные и локальные HTTP заглушки.
+Нужны Node.js 24 и npm. Runtime службы рассчитан на Linux с `bash` и `flock`.
+Исходники — `plugin/sh.iva/services/router`, тесты — `test/`.
+Сценарии используют вымышленные данные, временные каталоги и локальные заглушки.
+
+## Локальная проверка
 
 ```sh
 npm ci
-npm run format
-npm run build
 npm run check
+node scripts/check-panel.ts examples/notes
+node scripts/check-panel.ts examples/dynamic-notes
 bash -n plugin/sh.iva/services/router/launch.sh
 ```
 
-Редактируйте TypeScript, затем пересобирайте `server.mjs`, `lifecycle-worker.mjs` и `native-manager.mjs`. Сборка проверяется побайтово; ручное исправление bundle запрещено. CI проверяет сохранённый bundle без его предварительной перезаписи. Зависимости закреплены в lockfile, install-time скрипты не нужны сервису.
+`npm run check` включает формат, типы, тесты, побайтовую проверку bundles,
+privacy текущих файлов и reachable Git-истории, локальные ссылки и audit.
+Linux-тест launcher пропускается на macOS и выполняется в Linux CI.
+Проверка локальных ссылок не подтверждает доступность внешних URL.
 
-Изменение поведения требует согласования README, контрактов, документации и CHANGELOG. Для изменений повторов, доставки, прав и маршрутизации добавляйте регрессионные проверки. Не считайте unit-тесты проверкой полного Bridge или живого Telegram.
-
-Текущая область включает общий каталог, декларативные страницы iva-panels/v1, навигацию и карточку/проверку публичного stable отправки файлов и явно включённые чтение и редактор настроек Bitrix24 через собственные подтверждения плагина. Общий v2 API определён в docs/DYNAMIC_API.md и ADR0008; новые транспорты, доступ к секретам и расширение операций записи требуют отдельного архитектурного решения с проверкой прав. Отдельный lifecycle opt-in вызывает только штатный enable/disable в ограниченной systemd-задаче; это не произвольный API команд. Бизнес-правила остаются в соответствующей интеграции.
-
-Не добавляйте конфигурацию, runtime state, локальную память, личные пути или настоящие ответы сервисов в Git. `check:privacy` — дополнительная проверка, она не заменяет просмотр diff и истории. Для открытия репозитория обязательны условия [RELEASING](docs/RELEASING.md).
-
-Дополнительная проверка штатного Bridge:
+После изменения TypeScript:
 
 ```sh
-node scripts/check-bridge.mjs /path/to/isolated/iva-checkout
+npm run format
+npm run build
+npm run check
 ```
 
-В указанном checkout заранее выполните `npm ci`; используйте отдельный stock checkout с exact SHA. Script задаёт только синтетические credentials, создаёт временные data/config и запрещает getUpdates. CI запускает его для двух закреплённых SHA; границы описаны в COMPATIBILITY. Установка зависимостей upstream — отдельная тестовая среда, её аудит не заменяет аудит плагина.
+В поставке сохраняются `server.mjs`, `lifecycle-worker.mjs`, `native-manager.mjs`.
+Редактируйте исходники и пересобирайте; ручная правка bundle запрещена.
+CI проверяет сохранённые bundles без предварительной перезаписи.
 
-Для settings editing обязательно проверять durable acting intent до вызова с эффектом, отсутствие повторной mutation после ошибки доставки или неизвестного исхода, чужой owner/message, stale revision, отмену и TTL. `node scripts/check-settings.ts /path/to/exact/bitrix/plugin` проверяет настоящий bundle на изолированных данных без webhook. Второй аргумент `scripts/check-bridge.mjs` добавляет полный Bridge цикл с этим же bundle.
+## Подключение другого плагина
 
-Для изменения общего контракта проверяйте `node scripts/check-panel.ts examples/notes`, runtime validation и JSON Schema. Требования автору — [PLUGIN_API](docs/PLUGIN_API.md).
+Начните с [INTEGRATION](docs/INTEGRATION.md). Проверка поставляемого пакета
+отдельным процессом:
 
-Для lifecycle изменений запускайте `node scripts/check-lifecycle.mjs /path/to/isolated/iva-checkout`: штатные команды работают только с временным реестром, build/systemd/health подменены. Проверяйте queued/running перед эффектом, stale snapshot, отмену, повторы, частичный результат и отсутствие скрытого rollback. Настоящее Linux-переключение установки проверяется отдельно при нужном владельцу изменении.
+```sh
+node --test test/integration-example.test.ts
+```
 
-Для dev.10 запускайте также `node scripts/check-forced-build.mjs /path/to/isolated/iva-checkout`: он воспроизводит upstream reuse bug и проверяет настоящий native toggle dispatcher с force build hook. Исходники ядра не менять; тесты создают только временные данные.
+Для descriptor — [v1](docs/PLUGIN_API.md) и [v2](docs/DYNAMIC_API.md).
+Для карточок в разговоре — [CHAT_CARDS](docs/CHAT_CARDS.md).
+Поставляемый skill должен содержать тот же контракт и актуальные примеры,
+чтобы Иве не требовался доступ к приватным справочникам.
 
-Для v2 запускайте `node --test test/dynamic.test.ts`, проверяйте пример `node scripts/check-panel.ts examples/dynamic-notes` и совпадение поставляемых копий schema/контракта/helper. Проверки используют настоящий Unix socket и синтетические настройки; боевую установку не выполняют.
+## Проверки Bridge и менеджера
+
+CI использует изолированные exact checkout Ивы; их SHA перечислены в
+[COMPATIBILITY](docs/COMPATIBILITY.md) и [workflow](.github/workflows/check.yml).
+В заранее подготовленном тестовом окружении:
+
+```sh
+node scripts/check-settings.ts /path/to/exact/bitrix/plugin
+node scripts/check-bridge.mjs /path/to/isolated/iva-checkout /path/to/exact/bitrix/plugin
+node scripts/check-lifecycle.mjs /path/to/isolated/iva-checkout
+node scripts/check-forced-build.mjs /path/to/isolated/iva-checkout
+```
+
+Не используйте рабочую установку как sandbox. Исходники ядра не патчатся;
+скрипты создают временные данные. Bridge использует настоящий маршрут штатных
+модулей, Eve/Bot API заглушки и запрещает `getUpdates`. Менеджер использует
+подменённые systemd/build/health. Эти проверки не являются чистой установкой,
+живым Telegram или настоящим Linux lifecycle.
+
+Для своей основы сначала проверьте её контракт; новое имя версии не расширяет
+поддержку менеджера автоматически. Переход к другому exact SHA требует
+отдельной проверки и обновления матрицы.
+
+## Правила изменения
+
+- Сохраняйте обычные сообщения, native callbacks и единственный polling Bridge.
+- Права и бизнес-валидация принадлежат плагину; descriptor не выбирает shell,
+  произвольный tool, URL или секреты.
+- Для изменений доставки/записи проверяйте durable intent до эффекта, lost response,
+  повторы после рестарта, чужие кнопки, stale revision, TTL и status без записи.
+- Для lifecycle проверяйте весь реестр и соседние службы, а не только целевой enabled.
+- Согласуйте README, skill, manifest, схемы, инструкции и CHANGELOG с кодом.
+- При изменении устанавливаемого `plugin/` обновляйте package/lock, manifest и runtime version.
+- Не добавляйте реальные токены, webhook, runtime state, приватные пути и локальную память.
+
+## Перед pull request
+
+Опишите проблему и новое поведение для пользователя. Укажите проведённые проверки
+и их границы, изменения прав и миграции. Просмотрите staged diff, выполните
+`git diff --check` и дождитесь CI на exact SHA.
+
+[Требования к выпуску](docs/RELEASING.md), [безопасность](SECURITY.md),
+[план чистой установки](docs/ACCEPTANCE.md), [оформление иллюстраций](docs/VISUALS.md).

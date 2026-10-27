@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -70,3 +72,28 @@ jobs:
       - run: node scripts/check-lifecycle.mjs compat-core
 
       - run: node scripts/check-forced-build.mjs compat-core
+
+  bridge-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - uses: actions/checkout@v4
+        with:
+          repository: smixs/iva-agent
+          ref: ae313753a1ae11426d7d0bce90ef8d499c75219a
+          path: compat-core
+          persist-credentials: false
+      - run: npm ci
+        working-directory: compat-core
+      - uses: actions/checkout@v4
+        with:
+          repository: mamysh/iva-bitrix24
+          ref: 60d690eeb302f951178d255fc687abbce4c020a9
+          path: compat-bitrix
+          persist-credentials: false
+      - run: node scripts/check-bridge.mjs compat-core compat-bitrix/plugin

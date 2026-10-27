@@ -373,6 +373,32 @@ test("definite stale prepare rejection allows a fresh choice without uncertain l
 });
 
 test("SDK resources and example stay consistent; durable journal precedes plugin call", async (t) => {
+  for (const [source, resource] of [
+    [
+      "../examples/dynamic-notes/sh.iva/services/panels/server.mjs",
+      "../plugin/skills/iva-panels-integration/resources/example-server.mjs",
+    ],
+    [
+      "../docs/DYNAMIC_API.md",
+      "../plugin/skills/iva-panels-integration/resources/CONTRACT.md",
+    ],
+    [
+      "../docs/CHAT_CARDS.md",
+      "../plugin/skills/iva-panels-integration/resources/CHAT_CARDS.md",
+    ],
+  ]) {
+    const content = async (path: string) =>
+      (await readFile(new URL(path, import.meta.url), "utf8")).replace(
+        /\]\([^)]*\)/g,
+        "]",
+      );
+    assert.equal(
+      await content(source),
+      await content(resource),
+      `Installed SDK differs: ${resource}`,
+    );
+  }
+
   assert.equal(
     await readFile(
       new URL("../docs/panels-v2.schema.json", import.meta.url),

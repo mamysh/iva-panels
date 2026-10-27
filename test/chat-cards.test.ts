@@ -150,3 +150,95 @@ test("private chat socket accepts only prepare requests and never caller-provide
   assert.equal(calls.length, 1);
   assert.equal((calls[0] as unknown[])[2], 42);
 });
+
+test("expired, closed and owner-mismatched presentation retries never prepare or resend", async (t) => {
+  const dir = await realpath(await mkdtemp("/tmp/cc-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  let prepares = 0,
+    sends = 0,
+    now = 1000;
+  const store = new Store(dir);
+  const provider = {
+    async page() {
+      prepares++;
+      return { title: "Test", body: "", rows: [] };
+    },
+  };
+  const delivery = {
+    async send() {
+      sends++;
+      return 20;
+    },
+    async edit() {},
+  };
+  const engine = new Engine(store, provider, delivery, () => now);
+  const id = "d".repeat(24);
+  await engine.issue(id, "prepare", 42);
+  await assert.rejects(engine.issue(id, "prepare", 43), /CARD_UNAVAILABLE/);
+  const saved = await store.load();
+  saved.screens[id].closed = true;
+  await store.save(saved);
+  await assert.rejects(engine.issue(id, "prepare", 42), /CARD_UNAVAILABLE/);
+  saved.screens[id].closed = false;
+  await store.save(saved);
+  now += 16 * 60_000;
+  await assert.rejects(engine.issue(id, "prepare", 42), /CARD_UNAVAILABLE/);
+  assert.equal(prepares, 1);
+  assert.equal(sends, 1);
+});
+
+test("chat capacity refuses new work before prepare; ordinary panels event can clear expired unprotected screens", async (t) => {
+  const dir = await realpath(await mkdtemp("/tmp/cc-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = new Store(dir),
+    state = await store.load();
+  for (let i = 0; i < 100; i++)
+    state.screens[i.toString(16).padStart(24, "0")] = {
+      owner: 42,
+      chat: 42,
+      message: 20,
+      revision: 0,
+      expires: 1,
+      page: "home",
+      view: { title: "Expired", body: "", rows: [] },
+      closed: false,
+    };
+  await store.save(state);
+  let prepares = 0,
+    sends = 0;
+  const engine = new Engine(
+    store,
+    {
+      async page() {
+        prepares++;
+        return { title: "Catalog", body: "", rows: [] };
+      },
+    },
+    {
+      async send() {
+        sends++;
+        return 21;
+      },
+      async edit() {},
+    },
+    () => 1000,
+  );
+  await assert.rejects(
+    engine.issue("f".repeat(24), "prepare", 42),
+    /SCREEN_CAPACITY/,
+  );
+  assert.equal(prepares, 0);
+  assert.equal(sends, 0);
+  await engine.handle({
+    update_id: 1,
+    message: {
+      message_id: 10,
+      from: { id: 42, is_bot: false },
+      chat: { id: 42, type: "private" },
+      text: "/panels",
+    },
+  });
+  assert.equal(Object.keys((await store.load()).screens).length, 1);
+  assert.equal(prepares, 1);
+  assert.equal(sends, 1);
+});

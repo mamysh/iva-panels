@@ -79,22 +79,17 @@ Panels сохраняет preparing до prepare, offered после прове�
 
 [Поставляемый skill](../plugin/skills/iva-panels-integration/SKILL.md) объясняет Иве подключение существующего и проектирование нового плагина. Skill загружается стандартным механизмом Ивы после установки Panels. Это инструкция по запросу, а не автоматический патч чужих исходников и не глобальный перехват генератора плагинов. Карточка «Подключить к Panels» содержит готовый запрос для загрузки skill. Для независимого автора доступны этот контракт, schema и пример.
 
-## Проверено в разработке
+## Проверка реализации
 
-Реальный socket и helper, discovery, read/prepare/cancel/confirm/status, повтор confirm после перезапуска клиента, потерянный ответ, блокировка pending, чужой владелец, stale кнопка, delivery retry без второго эффекта, смена registry/версии, TTL, ошибочные права socket, symlink и несовместимые ответы проверяются в `test/dynamic.test.ts`. Проверка descriptor не доказывает доступность службы. Карточка поэтому отличает «API объявлен» от фактического ответа при открытии. Linux CI прошёл 82 теста и три stock Bridge версии; exact 2afd9e4 установлен штатным обновлением Panels. Владелец подтвердил новые карточки и переходы в Telegram; настоящие Bitrix/files пока не переведены на v2. Подробности — [COMPATIBILITY](COMPATIBILITY.md).
+`test/dynamic.test.ts` проверяет настоящий socket, helper, read/prepare/cancel/confirm/status,
+revision/TTL, fingerprint, неизвестный исход, чужие кнопки, права socket и symlink.
+`test/integration-example.test.ts` запускает копию поставляемого пакета отдельным
+процессом и проверяет его через общий API без специального адаптера.
 
-## Карточки плагинов в чате (0.3.0-rc.1)
+[Границы среды и актуальная совместимость](COMPATIBILITY.md).
 
-Необязательный приватный Unix socket PLUGIN_DATA/chat.sock (0600), POST /cards/v1,
-строгий envelope iva-panels/chat-v1: plugin, action, revision, requestId (24 hex).
-Доступен только при mode=panels и dynamicPanels; ровно один настроенный owner.
-Адресат, callback IDs, shell и confirm из запроса не принимаются. Общий provider
-проверяет trusted/enabled descriptor и вызывает только prepare у плагина.
-Карточка сразу отправляется тем же ботом в личный чат владельца, rich оформлением.
-Panels связывает последующий реальный callback с owner/chat/message/revision/TTL;
-плагин продолжает владеть бизнес-валидацией и durable эффектом.
-Intent сохраняется до prepare/send. Повтор того же requestId не отправляет карточку
-повторно, даже после неизвестной доставки или рестарта. Сохраняется предел 100 экранов;
-при исчерпании новые карточки отклоняются, журналы не удаляются ради повтора.
-Ответ: presented, already_presented или delivery_unknown. Это статус доставки,
-не подтверждение и не успех операции. Старые v2 descriptor/socket не меняются.
+## Карточки плагинов в чате
+
+В 0.3 RC плагин может попросить Panels показать своё v2 предложение прямо
+в личном чате. Транспорт выполняет только prepare и доставку; confirm/cancel/status
+остаются в этом протоколе. [Полный контракт, пример запроса и обработка ошибок](CHAT_CARDS.md).

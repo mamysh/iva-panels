@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="660" viewBox="0 0 1600 660" role="img" aria-labelledby="title description">
+<title id="title">Panels для Ивы</title>
+<desc id="description">Схематическая иллюстрация: каталог плагинов, настройки заметок и карточка подтверждения в одном Telegram-чате. Все данные вымышлены.</desc>
+<style>text{font-family:Arial,sans-serif;fill:#F3F5EF}.muted{fill:#A8B9AF}.title{font-size:26px;font-weight:700}.body{font-size:23px}.small{font-size:18px}.button{font-size:21px;font-weight:700;text-anchor:middle}</style>
+<rect width="1600" height="660" rx="28" fill="#080B0A"/>
+<path d="M40 0Q240 25 360 170M130 30Q90 100 110 183M170 50Q140 145 168 222M215 78Q190 160 221 240M266 112Q240 200 266 260" fill="none" stroke="#416452" stroke-width="3"/>
+<g fill="#91C9AD" opacity=".65"><ellipse cx="110" cy="168" rx="6" ry="21" transform="rotate(-14 110 168)"/><ellipse cx="166" cy="207" rx="6" ry="23" transform="rotate(-14 166 207)"/><ellipse cx="220" cy="224" rx="6" ry="24" transform="rotate(-18 220 224)"/><ellipse cx="266" cy="245" rx="6" ry="22" transform="rotate(-18 266 245)"/></g>
+<text x="76" y="340" font-size="64" font-weight="700">Panels</text>
+<text x="78" y="388" font-size="27" class="muted">Плагины Ивы.</text>
+<text x="78" y="426" font-size="27" class="muted">В вашем чате.</text>
+<rect x="78" y="470" width="174" height="42" rx="21" fill="#17251E" stroke="#416452"/>
+<text x="165" y="497" class="button" style="fill:#91C9AD">/panels</text>
+<rect x="410" y="92" width="340" height="438" rx="20" fill="#121B17" stroke="#375244"/>
+<text x="438" y="137" class="small muted">01 / КАТАЛОГ</text>
+<text x="438" y="182" class="title">Ваши плагины</text>
+<text x="438" y="218" class="body muted">Всё под рукой</text>
+<rect x="434" y="253" width="292" height="62" rx="12" fill="#1D3027"/><text x="455" y="293" class="body">Bitrix24</text>
+<rect x="434" y="330" width="292" height="62" rx="12" fill="#1D3027"/><text x="455" y="370" class="body">Заметки</text>
+<rect x="434" y="407" width="292" height="62" rx="12" fill="#1D3027"/><text x="455" y="447" class="body">Отправка файлов</text>
+<rect x="786" y="126" width="340" height="438" rx="20" fill="#121B17" stroke="#466477"/>
+<text x="814" y="171" class="small" style="fill:#95BFDA">02 / НАСТРОЙКИ</text>
+<text x="814" y="216" class="title">Заметки</text>
+<text x="814" y="267" class="body muted">Компактный вид</text>
+<text x="814" y="306" class="body">Выключен</text>
+<rect x="810" y="344" width="292" height="58" rx="12" fill="#233540"/><text x="956" y="382" class="button" style="fill:#95BFDA">Включить</text>
+<text x="814" y="454" class="small muted">Сначала — превью.</text>
+<text x="814" y="486" class="small muted">Затем — ваш выбор.</text>
+<rect x="1162" y="92" width="370" height="438" rx="20" fill="#121B17" stroke="#628E76"/>
+<text x="1190" y="137" class="small" style="fill:#91C9AD">03 / ПОДТВЕРЖДЕНИЕ</text>
+<text x="1190" y="182" class="title">Изменить настройку?</text>
+<text x="1190" y="237" class="body muted">Компактный вид</text>
+<text x="1190" y="277" class="body">Выключен → включён</text>
+<rect x="1186" y="327" width="322" height="58" rx="12" fill="#91C9AD"/><text x="1347" y="365" class="button" style="fill:#080B0A">Подтвердить</text>
+<rect x="1186" y="401" width="322" height="58" rx="12" fill="#302521" stroke="#6C5044"/><text x="1347" y="439" class="button" style="fill:#E8A88D">Отменить</text>
+<text x="1532" y="614" text-anchor="end" class="small muted">Иллюстрация интерфейса · Вымышленные данные</text>
+</svg>
