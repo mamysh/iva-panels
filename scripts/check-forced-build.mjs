@@ -147,18 +147,10 @@ try {
   assert.equal(reused.status, "updated");
   assert.equal(reused.version, first.version);
   const dropped = JSON.parse(await readFile(registry, "utf8")).plugins;
-  if (current) {
-    assert.deepEqual(
-      dropped.map((p) => p.enabled),
-      [true, true],
-      "current stock reuse must preserve all enabled plugins",
-    );
-  } else {
-    assert(
-      dropped.some((p) => !p.enabled),
-      "legacy stock reuse must reproduce MCP-only auto-drop",
-    );
-  }
+  assert(
+    dropped.some((plugin) => !plugin.enabled),
+    "unchanged stock reuse still drops an MCP-only peer: the force-build workaround must remain",
+  );
   // Real native toggle dispatcher wired to the Panels force callback.
   await put(both);
   let builds = 0;
@@ -375,7 +367,7 @@ try {
     );
   }
   console.log(
-    `Unchanged stock ${version}: reuse ${current ? "preserved peers" : "reproduced legacy auto-drop"}; forced disable/enable preserved both plugins; exact source pins and MCP paths survived checks`,
+    `Unchanged stock ${version}: reuse reproduced MCP-only auto-drop; forced disable/enable preserved both plugins; exact source pins and MCP paths survived checks`,
   );
 } finally {
   await rm(home, { recursive: true, force: true });
