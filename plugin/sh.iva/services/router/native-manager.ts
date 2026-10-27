@@ -5,14 +5,50 @@ import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { spawnSync, execFileSync } from "node:child_process";
 import { pluginName } from "./catalog.ts";
-const managers = [
+type Manager = { version: string; sources: Record<string, string> };
+const legacyPlugin =
+  "1999e073129e13f71fa1bed476f946fe34fd4f29d12afa8db66459599c834b3a";
+const managers: Manager[] = [
   {
     version: "0.4.12-5cf8f1963c82",
-    updater: "65abf07fd303080e5a41b28149d8fb67fde0a1b67cea2064c35f93f4a2261090",
+    sources: {
+      "scripts/lib/version-update.ts":
+        "65abf07fd303080e5a41b28149d8fb67fde0a1b67cea2064c35f93f4a2261090",
+      "scripts/cli/plugin.ts": legacyPlugin,
+    },
   },
   {
     version: "0.4.14-fa5586557f41",
-    updater: "10d6e8cb6ea8f2de30bdc075dbb51e6ad0bacede1a9ffd03b49ee896c778418e",
+    sources: {
+      "scripts/lib/version-update.ts":
+        "10d6e8cb6ea8f2de30bdc075dbb51e6ad0bacede1a9ffd03b49ee896c778418e",
+      "scripts/cli/plugin.ts": legacyPlugin,
+    },
+  },
+  {
+    version: "0.5.7-ae313753a1ae",
+    sources: {
+      "scripts/cli/plugin.ts":
+        "1999e073129e13f71fa1bed476f946fe34fd4f29d12afa8db66459599c834b3a",
+      "scripts/cli/plugin-cli-context.ts":
+        "6ecf9ff56e3a7fd261d3925a92946330a344afe659ef7c804c4db80fe1f5c851",
+      "scripts/cli/plugin-cli-trust.ts":
+        "920588e3ca3b1bd409d4608437dcd4fdbb7ab404675dd8f9254fc1908f46aff8",
+      "scripts/cli/runtime.ts":
+        "636dcebc236c7a61a806c9ab6c928a2eb3d61882f764867fc9c49e02898f6bdc",
+      "scripts/lib/plugin-core.ts":
+        "b30f5558d2845d083cd86a4ec065a1bca66e3882a3ade4ae1786e73fb19568d8",
+      "scripts/lib/version-update.ts":
+        "48e3ad0d7c4fdb4a1d79690725f9d3cb234f1b0fa8faac1d8b9b5e7d34aab312",
+      "scripts/lib/version-store.ts":
+        "095b51562a2bca2a32d932e2b637fd07487ea393c5758b35d07b55dfbd512d20",
+      "scripts/lib/plugin-build.ts":
+        "b0002b6387f76a57c83ba12885b2e848a9450a9ac09323ff196382e5e48a43d7",
+      "scripts/lib/plugin-units.ts":
+        "65107f12097944d02f7629a2cafffdbb9c8a58b537066dcb505b8ca2391785b9",
+      "scripts/update-finish.ts":
+        "297c73a1ac041771339aedac12ae1ebc5f447c2b48f1dc283ab832385301d865",
+    },
   },
 ];
 function managerFor(name: string) {
@@ -31,15 +67,10 @@ export async function supportedManager(cli: string, data: string) {
   const root = dirname(dirname(await realpath(cli)));
   const manager = managerFor(basename(root));
   if (!manager) throw new Error("UNSUPPORTED_MANAGER");
-  const sourceHashes = {
-    "scripts/lib/version-update.ts": manager.updater,
-    "scripts/cli/plugin.ts":
-      "1999e073129e13f71fa1bed476f946fe34fd4f29d12afa8db66459599c834b3a",
-  };
   const home = dirname(dirname(root));
   if ((await realpath(data)) !== (await realpath(join(home, "data"))))
     throw new Error("UNSUPPORTED_LAYOUT");
-  for (const [file, hash] of Object.entries(sourceHashes)) {
+  for (const [file, hash] of Object.entries(manager.sources)) {
     if (
       createHash("sha256")
         .update(await readFile(join(root, file)))
