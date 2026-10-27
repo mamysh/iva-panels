@@ -1,3 +1,4 @@
+import { serveChatCards } from "./chat-cards.ts";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { configSchema } from "./contracts.ts";
@@ -39,6 +40,10 @@ async function start() {
     ),
     telegram(config.botToken, config.presentation),
   );
+  const cards =
+    config.dynamicPanels && config.mode === "panels"
+      ? await serveChatCards(data, engine, config.owners)
+      : undefined;
   const server = createRouter(config, engine, (id) =>
     acknowledgeCallback(config.botToken, id),
   );
@@ -51,6 +56,7 @@ async function start() {
   );
   for (const signal of ["SIGTERM", "SIGINT"] as const)
     process.on(signal, () => {
+      cards?.close();
       server.close(() => {});
       setTimeout(() => {
         server.closeAllConnections();

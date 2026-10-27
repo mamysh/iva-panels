@@ -1,5 +1,11 @@
 ## 0.2.0 — 2026-10-09
 
+## 0.3.0-rc.1
+
+- Optional generic private chat-card transport for plugin-owned v2 proposals.
+- Durable delivery intent, no replay, real message-bound confirmation.
+- Rich field labels; no business decisions or arbitrary recipients in Panels.
+
 - Стабильный общий каталог плагинов, уровни связи и инструкция подключения для Ивы.
 - Необязательный v2 API собственных настроек и действий плагина с превью,
   подтверждением, отменой и проверкой результата без автоматического повтора.

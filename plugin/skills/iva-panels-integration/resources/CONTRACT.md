@@ -84,3 +84,19 @@ dynamic-notes — полный синтетический пакет с service,
 Реальный socket и helper, discovery, read/prepare/cancel/confirm/status, повтор confirm после перезапуска клиента, потерянный ответ, блокировка pending, чужой владелец, stale кнопка, delivery retry без второго эффекта, смена registry/версии, TTL, ошибочные права socket, symlink и несовместимые ответы проверяются в `test/dynamic.test.ts`. Проверка descriptor не доказывает доступность службы. Карточка поэтому отличает «API объявлен» от фактического ответа при открытии. Боевые установка и Telegram smoke этого контракта выполняются отдельно.
 
 В установленном skill доступны resources/panels-v2.schema.json, resources/settings-service.mjs и resources/example-server.mjs. Последний показывает функции validate/screen/propose на синтетическом плагине. Для своего плагина замените name/version и используйте его настоящее хранилище настроек.
+
+## Карточки плагинов в чате (0.3.0-rc.1)
+
+Необязательный приватный Unix socket PLUGIN_DATA/chat.sock (0600), POST /cards/v1,
+строгий envelope iva-panels/chat-v1: plugin, action, revision, requestId (24 hex).
+Доступен только при mode=panels и dynamicPanels; ровно один настроенный owner.
+Адресат, callback IDs, shell и confirm из запроса не принимаются. Общий provider
+проверяет trusted/enabled descriptor и вызывает только prepare у плагина.
+Карточка сразу отправляется тем же ботом в личный чат владельца, rich оформлением.
+Panels связывает последующий реальный callback с owner/chat/message/revision/TTL;
+плагин продолжает владеть бизнес-валидацией и durable эффектом.
+Intent сохраняется до prepare/send. Повтор того же requestId не отправляет карточку
+повторно, даже после неизвестной доставки или рестарта. Сохраняется предел 100 экранов;
+при исчерпании новые карточки отклоняются, журналы не удаляются ради повтора.
+Ответ: presented, already_presented или delivery_unknown. Это статус доставки,
+не подтверждение и не успех операции. Старые v2 descriptor/socket не меняются.

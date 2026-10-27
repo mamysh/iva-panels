@@ -82,3 +82,19 @@ Panels сохраняет preparing до prepare, offered после прове�
 ## Проверено в разработке
 
 Реальный socket и helper, discovery, read/prepare/cancel/confirm/status, повтор confirm после перезапуска клиента, потерянный ответ, блокировка pending, чужой владелец, stale кнопка, delivery retry без второго эффекта, смена registry/версии, TTL, ошибочные права socket, symlink и несовместимые ответы проверяются в `test/dynamic.test.ts`. Проверка descriptor не доказывает доступность службы. Карточка поэтому отличает «API объявлен» от фактического ответа при открытии. Linux CI прошёл 82 теста и три stock Bridge версии; exact 2afd9e4 установлен штатным обновлением Panels. Владелец подтвердил новые карточки и переходы в Telegram; настоящие Bitrix/files пока не переведены на v2. Подробности — [COMPATIBILITY](COMPATIBILITY.md).
+
+## Карточки плагинов в чате (0.3.0-rc.1)
+
+Необязательный приватный Unix socket PLUGIN_DATA/chat.sock (0600), POST /cards/v1,
+строгий envelope iva-panels/chat-v1: plugin, action, revision, requestId (24 hex).
+Доступен только при mode=panels и dynamicPanels; ровно один настроенный owner.
+Адресат, callback IDs, shell и confirm из запроса не принимаются. Общий provider
+проверяет trusted/enabled descriptor и вызывает только prepare у плагина.
+Карточка сразу отправляется тем же ботом в личный чат владельца, rich оформлением.
+Panels связывает последующий реальный callback с owner/chat/message/revision/TTL;
+плагин продолжает владеть бизнес-валидацией и durable эффектом.
+Intent сохраняется до prepare/send. Повтор того же requestId не отправляет карточку
+повторно, даже после неизвестной доставки или рестарта. Сохраняется предел 100 экранов;
+при исчерпании новые карточки отклоняются, журналы не удаляются ради повтора.
+Ответ: presented, already_presented или delivery_unknown. Это статус доставки,
+не подтверждение и не успех операции. Старые v2 descriptor/socket не меняются.

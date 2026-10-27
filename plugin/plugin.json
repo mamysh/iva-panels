@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "iva-panels",
-  "version": "0.2.0",
+  "version": "0.3.0-rc.1",
   "description": "Iva plugin catalog and panels, with opt-in settings and native enable/disable. Requires explicit Bridge routing configuration.",
   "extensions": {
     "sh.iva": {}
