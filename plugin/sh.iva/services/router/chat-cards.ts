@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Engine } from "./engine.ts";
-import { pluginKey } from "./catalog.ts";
+import { pluginKey, pluginName } from "./catalog.ts";
 const inputSchema = z
   .object({
     schema: z.literal("iva-panels/chat-v1"),
-    plugin: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-    action: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+    plugin: pluginName,
+    action: z.string().regex(/^[a-z][a-z0-9-]{0,23}$/),
     revision: z.number().int().nonnegative().max(999999999999),
     requestId: z.string().regex(/^[a-f0-9]{24}$/),
   })

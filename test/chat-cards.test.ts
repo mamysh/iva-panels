@@ -149,6 +149,13 @@ test("private chat socket accepts only prepare requests and never caller-provide
   assert.equal(await send(input), 200);
   assert.equal(calls.length, 1);
   assert.equal((calls[0] as unknown[])[2], 42);
+  assert.equal(await send({ ...input, plugin: "notes.demo" }), 200);
+  assert.equal(calls.length, 2);
+  for (const plugin of ["notes..demo", "notes--demo", "-notes", "notes-"]) {
+    assert.equal(await send({ ...input, plugin }), 400);
+  }
+  assert.equal(await send({ ...input, action: "x".repeat(25) }), 400);
+  assert.equal(calls.length, 2);
 });
 
 test("expired, closed and owner-mismatched presentation retries never prepare or resend", async (t) => {
