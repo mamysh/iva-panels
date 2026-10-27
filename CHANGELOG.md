@@ -1,5 +1,10 @@
 ## 0.2.0 — 2026-10-09
 
+## 0.3.0-rc.2
+
+- Reject expired/closed or owner-mismatched presentation retries.
+- Bridge compatibility checks compare visible labels independently of rich markup.
+
 ## 0.3.0-rc.1
 
 - Optional generic private chat-card transport for plugin-owned v2 proposals.
