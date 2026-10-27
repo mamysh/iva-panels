@@ -471,7 +471,7 @@ createInterface({input:process.stdin}).on('line', line => {
   };
   await choose("Bitrix24");
   await choose("Совместимая панель");
-  assert(current.text.includes("Ревизия настроек: 7"));
+  assert(current.text.replace(/<\/?b>/gu, "").includes("Ревизия настроек: 7"));
   await choose("Действия");
   assert(current.text.includes("только чтение"));
   await choose("Настройки Bitrix24");
