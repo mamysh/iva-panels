@@ -266,6 +266,11 @@ try {
     // changed delegated module must be refused before a command is available.
     for (const file of sources) {
       const original = await readFile(join(root, file));
+      await unlink(join(root, file));
+      await assert.rejects(
+        supportedManager(join(root, "bin/iva.mjs"), data),
+        /UNSUPPORTED_MANAGER/,
+      );
       await writeFile(join(root, file), "// incompatible source\n");
       await assert.rejects(
         supportedManager(join(root, "bin/iva.mjs"), data),
@@ -346,15 +351,13 @@ try {
     );
     await rm(root, { recursive: true });
     assert.match(await checkStart(), /next proxy/);
-    // Restore the fixture for the existing manager hash rejection.
+    // Restore every pinned source after pruning; then tamper only the updater.
     await mkdir(join(root, "bin"), { recursive: true });
     await writeFile(join(root, "bin/iva.mjs"), "// synthetic entry\n");
-    await mkdir(join(root, "scripts/lib"), { recursive: true });
-    await mkdir(join(root, "scripts/cli"), { recursive: true });
-    await writeFile(
-      join(root, "scripts/cli/plugin.ts"),
-      await readFile(join(core, "scripts/cli/plugin.ts")),
-    );
+    for (const file of sources) {
+      await mkdir(join(root, file, ".."), { recursive: true });
+      await writeFile(join(root, file), await readFile(join(core, file)));
+    }
     await unlink(join(home, "current"));
     await symlink(root, join(home, "current"));
     await writeFile(

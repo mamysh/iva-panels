@@ -73,7 +73,11 @@ export async function supportedManager(cli: string, data: string) {
   for (const [file, hash] of Object.entries(manager.sources)) {
     if (
       createHash("sha256")
-        .update(await readFile(join(root, file)))
+        .update(
+          await readFile(join(root, file)).catch(() => {
+            throw new Error("UNSUPPORTED_MANAGER");
+          }),
+        )
         .digest("hex") !== hash
     )
       throw new Error("UNSUPPORTED_MANAGER");
