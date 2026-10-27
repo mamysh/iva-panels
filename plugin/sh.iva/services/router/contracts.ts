@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0-rc.3";
 export const PREFIX = "iva_panels:";
 const LEGACY_PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
@@ -74,7 +74,15 @@ export function escape(text: string): string {
 }
 export function render(view: View, screen: string, revision: number) {
   const valid = viewSchema.parse(view);
-  const text = `<b>${escape(valid.title)}</b>\n\n${escape(valid.body)}`;
+  const text = `<b>${escape(valid.title)}</b>\n\n${valid.body
+    .split("\n")
+    .map((line) => {
+      const match = /^([^:]{1,40}): (.*)$/u.exec(line);
+      return match
+        ? `<b>${escape(match[1])}:</b> ${escape(match[2])}`
+        : escape(line);
+    })
+    .join("\n")}`;
   if (text.length > LIMITS.page) throw new Error("PAGE_TOO_LARGE");
   let index = 0;
   return {

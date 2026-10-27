@@ -13,22 +13,26 @@ flowchart LR
     S <--> D[(Приватное состояние)]
     S --> P[Plugin providers]
     P --> I[(Все регистрации Ивы)]
-    P --> V[Validated panels.json v1
+    P --> V[panels.json v1
 информационные страницы]
+    P -->|v2: read / prepare / confirm / status| Q[Приватный API плагина
+panels.sock]
+    X2[Плагин в разговоре] -->|prepare-and-present| C2[chat.sock Panels]
+    C2 --> S
     P -->|Явный opt-in| C[Отдельный stdio MCP client]
     C --> X[Установленный Bitrix24
 settings и diagnostics]
     P -->|lifecycle opt-in| L[Превью и приватный журнал задач]
     L --> W[Отдельная systemd worker unit]
     W --> N[Native adapter: штатный enable / disable]
-    N --> V[Полная штатная сборка текущего commit]
+    N --> Build[Полная штатная сборка текущего commit]
     N --> U[Реестр, службы и сборка Ивы]
     W --> H[Проверка версии, служб и health]
     P --> F[File-delivery manifest и правила]
     F -->|Проверить stable| G[Публичный GitHub GET
 fixed repo и pinned SHA]
     S --> A[Telegram Bot API
-sendMessage / editMessageText]
+sendMessage / sendRichMessage / editMessageText]
     A --> T
 ```
 
@@ -72,7 +76,7 @@ sequenceDiagram
 
 Незавершённые редактирования защищены от конкурентного действия, но постоянный отказ Telegram пока не имеет автоматического восстановления. Плагин не регистрирует `/panels` в видимом списке Telegram-команд. Общая очередь Bridge может задержать обработку кнопок во время работы агента.
 
-## Дальнейшая область
+## Расширение интеграций
 
 Имя `iva-panels` допускает карточки, списки и мастера для независимых интеграций. Provider остаётся внутренним TypeScript интерфейсом. Публичный descriptor v1 описывает информационные страницы; общий динамический API v2 реализован в 0.2.0-dev.1 (ADR0008). Внешние данные и запись не добавляются через случайное подключение чужой MCP-сессии. Для v2 используются фиксированный локальный socket, durable журнал предложений и отдельные проверки. Если upstream предоставит подходящий официальный API экранов, транспорт можно заменить, сохранив представления и навигацию.
 
@@ -94,8 +98,17 @@ Durable inbox объединяет быстрые сообщения в `message
 
 Встроенный lifecycle provider работает независимо от descriptor. Engine сохраняет acting и ID действия до provider. Confirm сохраняет queued до systemd-run; worker сохраняет running до CLI. Поэтому сбой engine восстанавливает только чтение результата, а CLI переживает рестарт Eve/Router. Ни delivery retry, ни кнопка проверки результата не повторяют команду. Статусы и пределы описаны в [ADR0006](adr/0006-native-lifecycle.md). Shared screen state читает только Router; worker меняет отдельный job файл. Update/downgrade исключает pending задачи.
 
-Dev.10 дополняет lifecycle [ADR0007](adr/0007-stock-force-management.md): native adapter использует неизменённые modules ядра, запрещает reuse, проверяет весь набор плагинов до и после операции. Неоднозначный результат блокирует дальнейшее управление; исходники ядра не меняются.
+Lifecycle следует [ADR0007](adr/0007-stock-force-management.md): native adapter использует неизменённые modules ядра, запрещает reuse, проверяет весь набор плагинов до и после операции. Неоднозначный результат блокирует дальнейшее управление; исходники ядра не меняются.
 
 ## Общий динамический API v2
 
 Каталог одинаков для всех плагинов. V2 descriptor объявляет entry/capabilities и не задаёт transport или executable. При opt-in DynamicPanels соединяется с фиксированным приватным socket плагина. Read возвращает ограниченные декларативные экраны, prepare создаёт preview, confirm/cancel используют сохранённый token. Регистрация и descriptor закреплены fingerprint; перед эффектом журнал fsync/rename сохраняет намерение. Status после неизвестного исхода только читает квитанцию; effect не повторяется. Подробности — [ADR0008](adr/0008-generic-plugin-api.md), [контракт](DYNAMIC_API.md).
+
+## Карточка в разговоре
+
+`chat.sock` принимает ограниченный envelope без адресата или confirm. Engine
+сохраняет намерение доставки, затем общий provider делает v2 prepare.
+Только callback сохранённого сообщения запускает обычный confirm/cancel путь.
+Дедупликация доставки ограничена сроком хранения экрана; постоянная защита
+внешнего эффекта принадлежит плагину. [Протокол и пределы](CHAT_CARDS.md),
+[решение](ADR-0009-chat-cards.md).

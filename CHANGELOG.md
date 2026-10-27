@@ -1,3 +1,30 @@
+# История изменений
+
+## 0.3.0-rc.3
+
+- Полный комплект интеграции: руководство автору, протокол карточек в чате и
+  self-contained инструкции в поставляемом skill.
+- Сквозная проверка стороннего примера отдельным процессом через общий API.
+- Актуальные инструкции установки, диагностики и совместимости; старый журнал
+  проверок вынесен отдельно. Новая главная и синтетическая схема возможностей.
+- Исправлены метаданные forwarded в lockfile: версия 0.2.0 согласована с закреплённым архивом.
+- Добавлена отдельная CI-проверка Bridge на exact Иве 0.5.7 без разрешения её lifecycle.
+- Privacy-проверка истории и проверка локальных ссылок документации.
+- Схема имени плагина в chat API согласована с каталогом, включая имена с точкой;
+  ID действия проверяется по общему v2 контракту. Список поддерживаемых менеджеров не расширялся.
+  Чистая установка остаётся отдельным этапом; stable 0.2.0 не меняется.
+
+## 0.3.0-rc.2
+
+- Reject expired/closed or owner-mismatched presentation retries.
+- Bridge compatibility checks compare visible labels independently of rich markup.
+
+## 0.3.0-rc.1
+
+- Optional generic private chat-card transport for plugin-owned v2 proposals.
+- Durable delivery intent, no replay, real message-bound confirmation.
+- Rich field labels; no business decisions or arbitrary recipients in Panels.
+
 ## 0.2.0 — 2026-10-09
 
 - Стабильный общий каталог плагинов, уровни связи и инструкция подключения для Ивы.

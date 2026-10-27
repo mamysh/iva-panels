@@ -471,7 +471,7 @@ createInterface({input:process.stdin}).on('line', line => {
   };
   await choose("Bitrix24");
   await choose("Совместимая панель");
-  assert(current.text.includes("Ревизия настроек: 7"));
+  assert(current.text.replace(/<\/?b>/gu, "").includes("Ревизия настроек: 7"));
   await choose("Действия");
   assert(current.text.includes("только чтение"));
   await choose("Настройки Bitrix24");
@@ -495,7 +495,12 @@ createInterface({input:process.stdin}).on('line', line => {
   await promote();
   let rich = calls.filter((c) => c.method === "sendRichMessage").at(-1).body
     .rich_message.html;
-  assert(rich.includes("<tg-button-row>"));
+  assert(
+    rich
+      .replaceAll("<b>", "")
+      .replaceAll("</b>", "")
+      .includes("<tg-button-row>"),
+  );
   const richButton = (label) => {
     const buttons = [
       ...rich.matchAll(
@@ -543,17 +548,51 @@ createInterface({input:process.stdin}).on('line', line => {
       )
       .at(-1).body.rich_message.html;
     if (label === "Отменить")
-      assert(rich.includes("Команда менеджеру не отправлялась"));
-    if (label === "Details") assert(rich.includes("Contract details"));
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("Команда менеджеру не отправлялась"),
+      );
+    if (label === "Details")
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("Contract details"),
+      );
     if (label === "offline · выключен")
-      assert(rich.includes("Состояние: выключен"));
-    if (label === "Правила отправки") assert(rich.includes("50 МиБ"));
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("Состояние: выключен"),
+      );
+    if (label === "Правила отправки")
+      assert(
+        rich.replaceAll("<b>", "").replaceAll("</b>", "").includes("50 МиБ"),
+      );
     if (label === "Проверить stable") {
-      assert(rich.includes("CI stable: успешен"));
-      assert(rich.includes("более новая версия"));
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("CI stable: успешен"),
+      );
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("более новая версия"),
+      );
     }
   }
-  assert(rich.includes("Панель закрыта"));
+  assert(
+    rich
+      .replaceAll("<b>", "")
+      .replaceAll("</b>", "")
+      .includes("Панель закрыта"),
+  );
   assert.equal(calls.filter((c) => c.method === "sendRichMessage").length, 1);
   if (process.argv[3]) {
     await stopService();
@@ -594,7 +633,12 @@ createInterface({input:process.stdin}).on('line', line => {
     await settingsTap("Совместимая панель");
     await settingsTap("Данные");
     await settingsTap("Рабочий профиль");
-    assert(rich.includes("После подтверждения:"));
+    assert(
+      rich
+        .replaceAll("<b>", "")
+        .replaceAll("</b>", "")
+        .includes("После подтверждения:"),
+    );
     await assert.rejects(readFile(join(bitrixData, "settings.json")), {
       code: "ENOENT",
     });
@@ -605,7 +649,12 @@ createInterface({input:process.stdin}).on('line', line => {
     await settingsTap("Данные");
     await settingsTap("Рабочий профиль");
     const confirm = await settingsTap("Подтвердить");
-    assert(rich.includes("Настройки сохранены"));
+    assert(
+      rich
+        .replaceAll("<b>", "")
+        .replaceAll("</b>", "")
+        .includes("Настройки сохранены"),
+    );
     const state = JSON.parse(
       await readFile(join(bitrixData, "settings.json"), "utf8"),
     );
@@ -703,7 +752,9 @@ createInterface({input:process.stdin}).on('line', line => {
       await readFile(join(dynamicData, "panels-settings.json"), "utf8"),
     );
   await dynamicTap(dynamicName);
-  assert(rich.includes("объявлен API"));
+  assert(
+    rich.replaceAll("<b>", "").replaceAll("</b>", "").includes("объявлен API"),
+  );
   await dynamicTap("Настройки");
   await dynamicTap("Toggle compact");
   assert.equal((await savedSettings()).revision, 0);
@@ -713,7 +764,12 @@ createInterface({input:process.stdin}).on('line', line => {
   await dynamicTap("Настройки");
   await dynamicTap("Toggle compact");
   const genericConfirm = await dynamicTap("Подтвердить");
-  assert(rich.includes("Настройки сохранены"));
+  assert(
+    rich
+      .replaceAll("<b>", "")
+      .replaceAll("</b>", "")
+      .includes("Настройки сохранены"),
+  );
   assert.equal((await savedSettings()).revision, 1);
   await stopService();
   await startService();
@@ -798,7 +854,12 @@ createInterface({input:process.stdin}).on('line', line => {
       await v2Tap("Настройки");
       await v2Tap("Данные сотрудников");
       await v2Tap("Разрешить email");
-      assert(rich.includes("После подтверждения:"));
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("После подтверждения:"),
+      );
       assert.equal((await bitrixPolicy()).revision, 1);
       assert.equal((await bitrixPolicy()).policy.email, false);
       await v2Tap("Отменить");
@@ -808,7 +869,12 @@ createInterface({input:process.stdin}).on('line', line => {
       await v2Tap("Данные сотрудников");
       await v2Tap("Разрешить email");
       const bitrixConfirm = await v2Tap("Подтвердить");
-      assert(rich.includes("Настройки сохранены"));
+      assert(
+        rich
+          .replaceAll("<b>", "")
+          .replaceAll("</b>", "")
+          .includes("Настройки сохранены"),
+      );
       assert.equal((await bitrixPolicy()).revision, 2);
       assert.equal((await bitrixPolicy()).policy.email, true);
       await stopService();
@@ -819,7 +885,9 @@ createInterface({input:process.stdin}).on('line', line => {
       await v2Tap("О плагине");
       await v2Tap("Совместимая панель");
       await v2Tap("Данные");
-      assert(rich.includes("разрешён"));
+      assert(
+        rich.replaceAll("<b>", "").replaceAll("</b>", "").includes("разрешён"),
+      );
       await v2Tap("Закрыть");
       await accept(message("ordinary after Bitrix v2"));
       await promote();

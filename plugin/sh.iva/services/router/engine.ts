@@ -34,6 +34,57 @@ export class Engine {
     this.delivery = delivery;
     this.now = now;
   }
+  /** Prepare and deliver a plugin-owned action here in chat. Never confirms it. */
+  issue(id: string, page: string, owner: number): Promise<{ state: string }> {
+    const operation = this.tail.then(async () => {
+      const state = await this.store.load();
+      const previous = state.screens[id];
+      if (previous) {
+        if (
+          previous.owner !== owner ||
+          previous.closed ||
+          previous.expires < this.now()
+        )
+          throw new Error("CARD_UNAVAILABLE");
+        return {
+          state:
+            previous.message === null
+              ? "delivery_unknown"
+              : "already_presented",
+        };
+      }
+      if (Object.keys(state.screens).length >= LIMITS.screens)
+        throw new Error("SCREEN_CAPACITY");
+      // Intent precedes provider prepare and send. An unknown send is never replayed.
+      state.screens[id] = {
+        owner,
+        chat: owner,
+        message: null,
+        revision: 0,
+        expires: this.now() + TTL,
+        page,
+        view: { title: "Подготовка", body: "", rows: [] },
+        closed: false,
+      };
+      await this.store.save(state);
+      const view = viewSchema.parse(await this.provider.page(page));
+      const payload = render(view, id, 0);
+      state.screens[id].view = view;
+      await this.store.save(state);
+      try {
+        const message = await this.delivery.send(owner, payload);
+        if (!Number.isSafeInteger(message) || message <= 0)
+          throw new Error("UNKNOWN_SEND");
+        state.screens[id].message = message;
+        await this.store.save(state);
+        return { state: "presented" };
+      } catch {
+        return { state: "delivery_unknown" };
+      }
+    });
+    this.tail = operation.catch(() => {});
+    return operation;
+  }
   handle(event: Event, part?: number): Promise<void> {
     const operation = this.tail.then(() => this.perform(event, part));
     this.tail = operation.catch(() => {});
