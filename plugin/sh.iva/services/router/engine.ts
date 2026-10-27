@@ -39,13 +39,20 @@ export class Engine {
     const operation = this.tail.then(async () => {
       const state = await this.store.load();
       const previous = state.screens[id];
-      if (previous)
+      if (previous) {
+        if (
+          previous.owner !== owner ||
+          previous.closed ||
+          previous.expires < this.now()
+        )
+          throw new Error("CARD_UNAVAILABLE");
         return {
           state:
             previous.message === null
               ? "delivery_unknown"
               : "already_presented",
         };
+      }
       if (Object.keys(state.screens).length >= LIMITS.screens)
         throw new Error("SCREEN_CAPACITY");
       // Intent precedes provider prepare and send. An unknown send is never replayed.
