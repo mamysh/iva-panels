@@ -27,7 +27,7 @@ npm run build
 npm run check
 ```
 
-В поставке сохраняются `server.mjs`, `lifecycle-worker.mjs`, `native-manager.mjs`, `inspect.mjs`.
+В поставке сохраняются `server.mjs`, `lifecycle-worker.mjs`, `native-manager.mjs`, `inspect.mjs`, `install.mjs`.
 Редактируйте исходники и пересобирайте; ручная правка bundle запрещена.
 CI проверяет сохранённые bundles без предварительной перезаписи.
 
@@ -89,3 +89,12 @@ node scripts/check-forced-build.mjs /path/to/isolated/iva-checkout
 
 [Требования к выпуску](docs/RELEASING.md), [безопасность](SECURITY.md),
 [план чистой установки](docs/ACCEPTANCE.md), [оформление иллюстраций](docs/VISUALS.md).
+
+Для установщика на изолированном exact checkout0.5.7:
+
+```sh
+node scripts/check-install.mjs /path/to/isolated/iva-checkout
+```
+
+Это native proposal/install smoke с настоящими bundles и flock, но заменой
+systemd/Telegram. Рабочую Иву не используйте как sandbox первой установки.
