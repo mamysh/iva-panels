@@ -1,6 +1,6 @@
 ---
 name: iva-panels-guide
-description: Use when asked how Panels, plugin settings, tasks or action confirmations work in this Iva chat.
+description: Use when installing or troubleshooting Panels, opening plugin settings, or explaining tasks and confirmations in Iva.
 ---
 
 # Поручение и подтверждение в чате
@@ -32,3 +32,20 @@ description: Use when asked how Panels, plugin settings, tasks or action confirm
 
 Этот skill не перехватывает штатные кнопки Ивы и не меняет её tasks, память или ядро.
 Он применяется после загрузки; исправление контекста ядра не заявляется.
+
+## Первая установка0.4 RC и восстановление
+
+До установки следуй INSTALL.md выбранного пакета и используй штатный plugin propose.
+После установки диагностика доступна без npm:
+
+```sh
+node "$IVA_DATA_DIR/custom/plugins/iva-panels/sh.iva/services/router/install.mjs" status
+```
+
+Если IVA_DATA_DIR не задан, сначала выясни фактический каталог данных штатным способом.
+Не выводи.env или токены. Connected означает проверенное соединение, presented —
+доставленную начальную карточку. Unknown delivery не разрешает повтор отправки:
+пользователь может открыть /panels. Rolled_back означает возврат прежнего маршрута;
+retry выполняется только по новому запросу владельца. Uncertain требует сверки
+оператора: не стирай journal/config/drop-in и не повторяй подключение вслепую.
+Manual_or_not_configured не разрешает заменять существующую ручную настройку.

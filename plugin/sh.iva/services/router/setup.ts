@@ -210,7 +210,15 @@ export async function rollbackSetup(
     throw new Error("SETUP_ROUTE_CHANGED");
   }
   try {
-    if (route !== undefined) await unlink(io.routeFile);
+    if (route !== undefined) {
+      await unlink(io.routeFile);
+      const directory = await open(join(io.routeFile, ".."), "r");
+      try {
+        await directory.sync();
+      } finally {
+        await directory.close();
+      }
+    }
     await io.reload();
     await io.restartBridge();
     state.phase = "rolled_back";

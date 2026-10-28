@@ -7,7 +7,6 @@ import {
   lstat,
   stat,
   readdir,
-  copyFile,
   chmod,
   mkdir,
 } from "node:fs/promises";
@@ -16,7 +15,7 @@ import { homedir } from "node:os";
 import { supportedManager } from "./native-manager.ts";
 import { smallJson, entrySchema } from "./catalog.ts";
 import { configSchema } from "./contracts.ts";
-import { digest, type SetupIO, type SetupPlan } from "./setup.ts";
+import { digest, durableWrite, type SetupIO, type SetupPlan } from "./setup.ts";
 const registrySchema = z.object({ plugins: z.array(entrySchema).max(1000) });
 const routerService = z.object({
   router: z.object({ port: z.number().int().min(1).max(65535) }),
@@ -67,6 +66,21 @@ export async function discoverSetup() {
   );
   return { current, data, raw, env };
 }
+async function stockDropins() {
+  const directory = join(homedir(), ".config/systemd/user", `${POLL}.d`);
+  let parent = directory;
+  while (!(await lstat(parent).catch(() => undefined)))
+    parent = resolve(parent, "..");
+  if ((await realpath(parent)) !== resolve(parent))
+    throw new Error("SETUP_DIRECTORY_UNSAFE");
+  if (
+    (await show("DropInPaths")) ||
+    (await readdir(directory).catch(() => [] as string[])).some((n) =>
+      n.endsWith(".conf"),
+    )
+  )
+    throw new Error("SETUP_EXISTING_ROUTE_OVERRIDE");
+}
 const pollPins: Record<string, string> = {
   "scripts/poller/config.ts":
     "ed3ca16acc2ebcd7a9bb08a33c16407879b8f1b8f7c3d92c368b356609e8efe8",
@@ -96,13 +110,7 @@ export function systemSetupIO(data: string, plugin: string): SetupIO {
     for (const [file, hash] of Object.entries(pollPins))
       if (digest(await readFile(join(root, file))) !== hash)
         throw new Error("SETUP_UNSUPPORTED_POLLER");
-    if (
-      (await show("DropInPaths")) ||
-      (await readdir(dropdir).catch(() => [] as string[])).some((n) =>
-        n.endsWith(".conf"),
-      )
-    )
-      throw new Error("SETUP_EXISTING_ROUTE_OVERRIDE");
+    await stockDropins();
     const poll = await ctl("cat", POLL);
     if (
       /ASSISTANT_HOST\s*=/.test(poll) ||
@@ -174,11 +182,13 @@ export function systemSetupIO(data: string, plugin: string): SetupIO {
     async arm(id) {
       // Copy the recovery bundle into persistent data; uninstalling/updating source cannot remove it.
       const recovery = join(directory, "installer-recovery.mjs");
-      await copyFile(
-        join(plugin, "sh.iva/services/router/install.mjs"),
+      await durableWrite(
         recovery,
+        await readFile(
+          join(plugin, "sh.iva/services/router/install.mjs"),
+          "utf8",
+        ),
       );
-      await chmod(recovery, 0o600);
       await command("systemd-run", [
         "--user",
         `--unit=${unit(id)}`,
@@ -223,6 +233,8 @@ export function systemSetupIO(data: string, plugin: string): SetupIO {
       );
     },
     async canRestore() {
+      const loaded = await show("DropInPaths");
+      if (loaded && loaded !== routeFile) return false;
       return (await readdir(dropdir).catch(() => [] as string[]))
         .filter((n) => n.endsWith(".conf"))
         .every((n) => n === basename(routeFile));
@@ -290,8 +302,7 @@ export async function preflightInstall(plugin: string) {
   );
   if (registry.plugins.some((p: { name: string }) => p.name === "iva-panels"))
     return { state: "already_installed", data: d.data, current: d.current };
-  if (await show("DropInPaths"))
-    throw new Error("SETUP_EXISTING_ROUTE_OVERRIDE");
+  await stockDropins();
   const poll = await ctl("cat", POLL);
   if (
     /ASSISTANT_HOST\s*=/.test(poll) ||
