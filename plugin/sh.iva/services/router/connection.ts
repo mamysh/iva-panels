@@ -49,16 +49,22 @@ export function connectionPage(
   p: PluginEntry,
   status: ConnectionStatus,
   enabled: boolean,
+  report?: { state: string; next: string },
 ): View {
   return {
-    title: `${p.name} · Подключение к Panels`,
+    title: `${p.name} · Подключение настроек`,
     body:
-      `Связь: ${status.label}.\nОбщий API в Panels: ${enabled ? "разрешён оператором" : "выключен оператором"}.\n\n` +
-      `Чтобы подготовить подключение, отправьте Иве:\n\n«Подключи плагин ${p.name} к Panels. Загрузи skill iva-panels-integration из установленного iva-panels, проверь возможности и подготовь совместимый panels.json и API. Сохрани самостоятельную работу плагина. Покажи изменения и результаты тестов перед установкой».\n\n` +
-      "Инструкция поставляется с Panels в skills/iva-panels-integration. Кнопка открывает инструкцию; исходники и доверие плагина автоматически не меняются. Поддержка настроек добавляется в сам плагин. Включение/выключение не требует этого API.",
+      `Доступ в Panels: ${enabled ? "включён" : "выключен оператором"}.\nСостояние: ${report?.state === "ready" ? "чтение API проверено" : status.label}.\n\n${report?.next ?? (enabled ? "Проверьте поддержку API в самом плагине." : "Доступ к API выключен в Panels; нужна проверка оператора.")}\n\n` +
+      (report?.state === "ready" ||
+      report?.state === "disabled" ||
+      report?.state === "paused" ||
+      report?.state === "unavailable"
+        ? ""
+        : `Для доработки отправьте Иве:\n«Подключи плагин ${p.name} к Panels. Загрузи iva-panels-integration. Сначала выполни поставляемую диагностику inspect.mjs для ${p.name}. Добавь только недостающие возможности в исходниках этого плагина, сохрани его обычную работу. Покажи изменения и тесты».\n\n`) +
+      "Открытие этой страницы не устанавливает код и не меняет доверие. Для обычного поручения или подтверждения оставайтесь в чате с Ивой.",
     rows: [
       [
-        { id: cardId(p.name), label: "О плагине" },
+        { id: cardId(p.name), label: "Назад" },
         { id: "close", label: "Закрыть" },
       ],
     ],

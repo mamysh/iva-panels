@@ -148,7 +148,7 @@ test("real socket: discover API, read, prepare without change, cancel, confirm o
   assert.equal((await f.state()).revision, 1);
   assert.match(
     (await f.provider.page(`connect:${pluginKey(name)}`)).body,
-    /iva-panels-integration/,
+    /чтение API проверено/,
   );
 });
 test("lost confirm response and router restart: status reconciles without replay; pending blocks new changes", async (t) => {

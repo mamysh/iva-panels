@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
-import type { View } from "./contracts.ts";
+import { VERSION, type View } from "./contracts.ts";
 import {
   bitrixPage,
   bitrixReader,
@@ -27,11 +27,13 @@ import {
   dynamicReadId,
   isDynamicMutation,
 } from "./dynamic.ts";
+import { inspectIntegration } from "./integration.ts";
 import { connectionPage, connectionStatus } from "./connection.ts";
 import { Lifecycle, isLifecycleMutation } from "./lifecycle.ts";
 const titles: Record<string, string> = {
   "bitrix24-read": "Bitrix24",
   "file-delivery": "Отправка файлов",
+  "iva-panels": "Panels",
 };
 const registry = z
   .object({ plugins: z.array(entrySchema).max(1000) })
@@ -54,6 +56,7 @@ export function installedPanels(
   checkFiles: FileCheck = fileUpdateCheck(),
   lifecycle?: Lifecycle,
   dynamic?: DynamicPanels,
+  interfaceStatus?: { mode: string; presentation: string },
 ): Provider {
   const provider: Provider = {
     isMutation: (id) =>
@@ -129,6 +132,62 @@ export function installedPanels(
           };
         return lifecycle.page(id);
       }
+      if (id === "help")
+        return {
+          title: "Как пользоваться",
+          body: "Поручение: напишите Иве, что нужно сделать. Для обычной задачи достаточно сообщения в чате.\n\nПодтверждение: поддерживающий эту возможность плагин покажет карточку с итогом и кнопками прямо в чате. Открывать каталог для этого не нужно.\n\nНастройки: выберите плагин в списке. Кнопка «О плагине» рядом открывает версию, подключение и включение/выключение.\n\n«В задачи» в сообщении Ивы сохраняет пункт в её обычный список. Это не подтверждение и не отправка сообщения от вашего имени.",
+          rows: [
+            [
+              { id: "home", label: "К плагинам" },
+              { id: "close", label: "Закрыть" },
+            ],
+          ],
+        };
+      if (id === "panels")
+        return {
+          title: "Panels · Состояние",
+          body: `Версия: ${VERSION}\nИнтерфейс: ${interfaceStatus?.mode === "passthrough" ? "сквозной режим" : "панели"}\nКарточки: ${interfaceStatus?.presentation === "classic" ? "обычные кнопки" : "компактные кнопки"}\nAPI плагинов: ${dynamic ? "включён" : "выключен"}\nВключение/выключение: ${lifecycle ? "настроено; совместимость проверяется перед действием" : "не настроено"}\n\nPanels уже обслуживает этот интерфейс. Подключать его к самому себе не нужно.\nДля действий напишите Иве; подтверждение поддерживаемой операции появится прямо в чате. Параметры соединения меняет оператор, секреты здесь не показываются.`,
+          rows: [
+            [{ id: "help", label: "Как пользоваться" }],
+            [
+              { id: "home", label: "К плагинам" },
+              { id: "close", label: "Закрыть" },
+            ],
+          ],
+        };
+      if (id.startsWith("open:")) {
+        const p = plugins.find((p) => `open:${pluginKey(p.name)}` === id);
+        if (!p)
+          return {
+            title: "Плагин не найден",
+            body: "Проверьте имя в списке установленных плагинов.",
+            rows: [
+              [
+                { id: "home", label: "К плагинам" },
+                { id: "close", label: "Закрыть" },
+              ],
+            ],
+          };
+        if (p.name === "iva-panels") return provider.page("panels");
+        if (p.enabled && p.trusted) {
+          const metadata = await pluginMetadata(data, p);
+          const d = await dynamicDefinition(data, p, metadata?.version);
+          if (d && dynamic)
+            return provider.page(dynamicReadId(p.name, d.entry));
+          const staticPanel = await pluginDefinition(
+            data,
+            p,
+            metadata?.version,
+          );
+          if (staticPanel)
+            return provider.page(
+              `panel:${pluginKey(p.name)}:${staticPanel.entry}`,
+            );
+          if (titles[p.name] && (p.name !== "bitrix24-read" || bitrixReadOnly))
+            return provider.page(p.name);
+        }
+        return provider.page(cardId(p.name));
+      }
       const manage = (view: View, name: string): View =>
         lifecycle
           ? {
@@ -138,7 +197,7 @@ export function installedPanels(
                 [
                   {
                     id: `life:open:${pluginKey(name)}`,
-                    label: "Управление плагином",
+                    label: "Включить / выключить",
                   },
                 ],
                 ...view.rows.slice(-1),
@@ -159,22 +218,26 @@ export function installedPanels(
           .slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
           .map((p) => [
             {
-              id: cardId(p.name),
+              id: `open:${pluginKey(p.name)}`,
               label: `${(titles[p.name] ?? p.name).slice(0, 45)}${!p.enabled ? " · выключен" : !p.trusted ? " · без доверия" : ""}`,
             },
+            { id: cardId(p.name), label: "О плагине" },
           ]);
         const paging = [
-          ...(page > 0 ? [{ id: `catalog:${page - 1}`, label: "Назад" }] : []),
+          ...(page > 0
+            ? [{ id: `catalog:${page - 1}`, label: "Предыдущие" }]
+            : []),
           ...(page < pages - 1
-            ? [{ id: `catalog:${page + 1}`, label: "Далее" }]
+            ? [{ id: `catalog:${page + 1}`, label: "Следующие" }]
             : []),
         ];
         return {
           title: "Плагины",
-          body: `Установлено: ${plugins.length}\nСтраница ${page + 1} из ${pages}\n\nСостояние регистрации в Иве. Работу служб и внешних сервисов здесь не проверяли.`,
+          body: `Установлено: ${plugins.length}\nСтраница ${page + 1} из ${pages}\n\nНажмите название, чтобы открыть настройки или доступные возможности. «О плагине» — сведения и управление. Для поручения просто напишите Иве.`,
           rows: [
             ...rows,
             ...(paging.length ? [paging] : []),
+            [{ id: "help", label: "Как пользоваться" }],
             [
               { id: `catalog:${page}`, label: "Обновить список" },
               { id: "close", label: "Закрыть" },
@@ -193,11 +256,13 @@ export function installedPanels(
             rows: [navigation],
           };
         const metadata = await pluginMetadata(data, plugin);
+        if (plugin.name === "iva-panels") return provider.page("panels");
         if (external[1] === "connect")
           return connectionPage(
             plugin,
             await connectionStatus(data, plugin, metadata?.version),
             Boolean(dynamic),
+            await inspectIntegration(data, plugin.name, Boolean(dynamic)),
           );
         const definition = await dynamicDefinition(
           data,
@@ -224,6 +289,7 @@ export function installedPanels(
             body: "Плагин удалён или список изменился. Обновите список.",
             rows: [navigation],
           };
+        if (matches[0].name === "iva-panels") return provider.page("panels");
         const p = matches[0],
           metadata = await pluginMetadata(data, p);
         const definition = await pluginDefinition(data, p, metadata?.version);
@@ -271,12 +337,12 @@ export function installedPanels(
               id: `connect:${pluginKey(p.name)}`,
               label:
                 status.kind === "dynamic"
-                  ? "О подключении"
-                  : "Подключить к Panels",
+                  ? "Проверить подключение"
+                  : "Как добавить настройки",
             },
           ],
-          ...(titles[p.name] && p.enabled && p.trusted
-            ? [[{ id: p.name, label: "Совместимая панель" }]]
+          ...(!dynamicDescriptor && titles[p.name] && p.enabled && p.trusted
+            ? [[{ id: p.name, label: "Возможности плагина" }]]
             : []),
         );
         return manage(card, p.name);

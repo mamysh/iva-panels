@@ -4,7 +4,6 @@ import { lstat, mkdir, open, rename, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import {
-  cardId,
   pluginKey,
   pluginName,
   smallJson,
@@ -275,7 +274,12 @@ export class DynamicPanels {
       .update(JSON.stringify([p, d]))
       .digest("hex");
   }
-  private view(p: PluginEntry, d: DynamicDefinition, value: unknown): View {
+  private view(
+    p: PluginEntry,
+    d: DynamicDefinition,
+    value: unknown,
+    page: string,
+  ): View {
     const screen = dynamicScreenSchema.parse(value);
     const view = {
       title: screen.title,
@@ -290,20 +294,22 @@ export class DynamicPanels {
                 : `dyn:prepare:${pluginKey(p.name)}:${screen.revision}:${b.action}`,
           })),
         ),
-        ...(screen.rows
-          .flat()
-          .some((button) => "target" in button && button.target === d.entry)
-          ? []
-          : [
+        ...(!screen.rows.flat().some((b) => "target" in b && b.target === page)
+          ? [[{ id: dynamicReadId(p.name, page), label: "Обновить" }]]
+          : []),
+        ...(page !== d.entry &&
+        !screen.rows.flat().some((b) => "target" in b && b.target === d.entry)
+          ? [
               [
                 {
                   id: dynamicReadId(p.name, d.entry),
-                  label: "Обновить раздел",
+                  label: "К разделам плагина",
                 },
               ],
-            ]),
+            ]
+          : []),
         [
-          { id: cardId(p.name), label: "О плагине" },
+          { id: "home", label: "К плагинам" },
           { id: "close", label: "Закрыть" },
         ],
       ],
@@ -327,7 +333,7 @@ export class DynamicPanels {
             ]
           : []),
         [
-          { id: cardId(p.name), label: "О плагине" },
+          { id: "home", label: "К плагинам" },
           { id: "close", label: "Закрыть" },
         ],
       ],
@@ -371,6 +377,7 @@ export class DynamicPanels {
             op: "read",
             page: parts[3],
           }),
+          parts[3],
         );
       } catch {
         return this.notice(

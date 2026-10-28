@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const VERSION = "0.3.0-rc.4";
+export const VERSION = "0.3.0-rc.5";
 export const PREFIX = "iva_panels:";
 const LEGACY_PREFIX = "ipanel:";
 export const ACCEPTANCE = "x-iva-telegram-acceptance";
@@ -58,10 +58,22 @@ export function parseAction(text: string) {
     ? { screen: m[1], revision: Number(m[2]), index: Number(m[3]) }
     : null;
 }
+/** Only explicit slash commands; never consume ordinary prose or native callbacks. */
+export function panelCommand(text: unknown): string | undefined {
+  if (typeof text !== "string") return undefined;
+  const match =
+    /^\/\s*panels(?:\s+([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?))?\s*$/.exec(text);
+  if (
+    !match ||
+    (match[1] && (match[1].length > 64 || /\.\.|--/.test(match[1])))
+  )
+    return undefined;
+  return match[1] ?? "";
+}
 export function owns(text: unknown): boolean {
   return (
     typeof text === "string" &&
-    (text === "/panels" ||
+    (panelCommand(text) !== undefined ||
       text.startsWith(PREFIX) ||
       text.startsWith(LEGACY_PREFIX))
   );

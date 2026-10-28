@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { promisify } from "node:util";
 import { once } from "node:events";
 import {
   cp,
@@ -26,6 +27,7 @@ import { Store } from "../plugin/sh.iva/services/router/store.ts";
 import { serveChatCards } from "../plugin/sh.iva/services/router/chat-cards.ts";
 import type { render } from "../plugin/sh.iva/services/router/contracts.ts";
 
+import { inspectIntegration } from "../plugin/sh.iva/services/router/integration.ts";
 const name = "dynamic-notes-example";
 async function stop(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null) return;
@@ -114,6 +116,35 @@ test(
   { timeout: 15000 },
   async (t) => {
     const f = await fixture(t);
+    await writeFile(
+      join(f.panelsData, "config.json"),
+      JSON.stringify({
+        upstream: "http://127.0.0.1:9000",
+        secret: "synthetic-secret-123",
+        botToken: "42:synthetic",
+        owners: [42],
+        mode: "panels",
+        dynamicPanels: true,
+      }),
+      { mode: 0o600 },
+    );
+    const inspected = await promisify(execFile)(
+      process.execPath,
+      [resolve("plugin/sh.iva/services/router/inspect.mjs"), f.data, name],
+      { cwd: f.panelsData, env: { PATH: process.env.PATH } },
+    );
+    assert.equal(
+      JSON.parse(inspected.stdout).state,
+      "ready",
+      "packaged diagnostic must run outside a checkout without npm",
+    );
+    const baseline = await f.state();
+    assert.equal((await inspectIntegration(f.data, name, true)).state, "ready");
+    assert.deepEqual(
+      await f.state(),
+      baseline,
+      "diagnostic read must not change settings or receipts",
+    );
     let provider = f.provider();
     const card = await provider.page(cardId(name));
     assert(card.rows.flat().some((b) => b.id === dynamicReadId(name, "home")));
