@@ -100,7 +100,12 @@ async function start() {
     }
   }
 }
-start().catch(() => {
-  console.error("iva-panels: startup failed; check private config and data");
+start().catch((error) => {
+  const code = /^SETUP_[A-Z_]+$/.test(error?.message)
+    ? ` (${error.message})`
+    : "";
+  console.error(
+    `iva-panels: startup failed; check private config and data${code}`,
+  );
   process.exitCode = 1;
 });

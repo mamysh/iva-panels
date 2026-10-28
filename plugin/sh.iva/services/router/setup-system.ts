@@ -4,6 +4,7 @@ import { promisify, parseEnv } from "node:util";
 import {
   readFile,
   realpath,
+  lstat,
   stat,
   readdir,
   copyFile,
@@ -36,7 +37,14 @@ export async function command(binary: string, args: string[], timeout = 12000) {
         env: process.env,
       })
     ).stdout.trim();
-  } catch {
+  } catch (error) {
+    try {
+      const report = JSON.parse(String((error as { stdout?: string }).stdout));
+      if (/^SETUP_[A-Z_]+$/.test(report.error)) throw new Error(report.error);
+    } catch (parsed) {
+      if (parsed instanceof Error && /^SETUP_[A-Z_]+$/.test(parsed.message))
+        throw parsed;
+    }
     throw new Error("SETUP_SYSTEM_COMMAND_FAILED");
   } // Never log captured environment/output.
 }
@@ -237,6 +245,16 @@ async function health(url: string) {
 export async function setupWorker(plugin: string, data: string, op: string) {
   const directory = join(data, "plugin-data/iva-panels");
   await mkdir(directory, { recursive: true, mode: 0o700 });
+  const info = await lstat(directory);
+  if (
+    !info.isDirectory() ||
+    info.isSymbolicLink() ||
+    (process.getuid && info.uid !== process.getuid()) ||
+    (await realpath(directory)) !== resolve(directory)
+  )
+    throw new Error("SETUP_DIRECTORY_UNSAFE");
+  // Native install creates PLUGIN_DATA with default directory permissions; make our own data private before writing secrets.
+  await chmod(directory, 0o700);
   const result = await command(
     "/usr/bin/flock",
     [
