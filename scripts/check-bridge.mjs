@@ -278,7 +278,7 @@ try {
       ...options,
     });
   }
-  await accept(message("/panels"));
+  await accept(message("/ panels"));
   await promote();
   const opens = () =>
     calls.filter(
@@ -470,7 +470,6 @@ createInterface({input:process.stdin}).on('line', line => {
       .at(-1).body;
   };
   await choose("Bitrix24");
-  await choose("Совместимая панель");
   assert(current.text.replace(/<\/?b>/gu, "").includes("Ревизия настроек: 7"));
   await choose("Действия");
   assert(current.text.includes("только чтение"));
@@ -513,18 +512,16 @@ createInterface({input:process.stdin}).on('line', line => {
   };
   for (const label of [
     "Bitrix24",
-    "Совместимая панель",
     "Действия",
     "Настройки Bitrix24",
     "К плагинам",
     "Отправка файлов",
-    "Совместимая панель",
     "Правила отправки",
     "Отправка файлов",
     "Обновления",
     "Проверить stable",
     "Отправка файлов",
-    "Управление плагином",
+    "Включить / выключить",
     "Выключить плагин",
     "Отменить",
     "О плагине",
@@ -532,7 +529,6 @@ createInterface({input:process.stdin}).on('line', line => {
     "offline · выключен",
     "К плагинам",
     "demo",
-    "Открыть разделы",
     "Details",
     "Demo home",
     "О плагине",
@@ -630,7 +626,6 @@ createInterface({input:process.stdin}).on('line', line => {
       return event;
     };
     await settingsTap("Bitrix24");
-    await settingsTap("Совместимая панель");
     await settingsTap("Данные");
     await settingsTap("Рабочий профиль");
     assert(
@@ -753,15 +748,15 @@ createInterface({input:process.stdin}).on('line', line => {
     );
   await dynamicTap(dynamicName);
   assert(
-    rich.replaceAll("<b>", "").replaceAll("</b>", "").includes("объявлен API"),
+    rich.includes("Toggle compact"),
+    "plugin name opens live API directly",
   );
-  await dynamicTap("Настройки");
   await dynamicTap("Toggle compact");
   assert.equal((await savedSettings()).revision, 0);
   await dynamicTap("Отменить");
   assert.equal((await savedSettings()).settings.compact, false);
-  await dynamicTap("О плагине");
-  await dynamicTap("Настройки");
+  await dynamicTap("К плагинам");
+  await dynamicTap(dynamicName);
   await dynamicTap("Toggle compact");
   const genericConfirm = await dynamicTap("Подтвердить");
   assert(
@@ -851,7 +846,6 @@ createInterface({input:process.stdin}).on('line', line => {
         return event;
       };
       await v2Tap("Bitrix24");
-      await v2Tap("Настройки");
       await v2Tap("Данные сотрудников");
       await v2Tap("Разрешить email");
       assert(
@@ -864,8 +858,8 @@ createInterface({input:process.stdin}).on('line', line => {
       assert.equal((await bitrixPolicy()).policy.email, false);
       await v2Tap("Отменить");
       assert.equal((await bitrixPolicy()).revision, 1);
-      await v2Tap("О плагине");
-      await v2Tap("Настройки");
+      await v2Tap("К плагинам");
+      await v2Tap("Bitrix24");
       await v2Tap("Данные сотрудников");
       await v2Tap("Разрешить email");
       const bitrixConfirm = await v2Tap("Подтвердить");
@@ -882,9 +876,9 @@ createInterface({input:process.stdin}).on('line', line => {
       await accept(structuredClone(bitrixConfirm));
       await promote();
       assert.equal((await bitrixPolicy()).revision, 2);
-      await v2Tap("О плагине");
-      await v2Tap("Совместимая панель");
-      await v2Tap("Данные");
+      await v2Tap("К плагинам");
+      await v2Tap("Bitrix24");
+      await v2Tap("Данные сотрудников");
       assert(
         rich.replaceAll("<b>", "").replaceAll("</b>", "").includes("разрешён"),
       );

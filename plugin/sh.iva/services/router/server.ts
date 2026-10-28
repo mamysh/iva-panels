@@ -37,6 +37,7 @@ async function start() {
         ? new Lifecycle(ivaData, data, config.lifecycle)
         : undefined,
       config.dynamicPanels ? new DynamicPanels(ivaData, data) : undefined,
+      { mode: config.mode, presentation: config.presentation },
     ),
     telegram(config.botToken, config.presentation),
   );

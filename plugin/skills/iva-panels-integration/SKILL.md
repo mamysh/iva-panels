@@ -1,11 +1,21 @@
 ---
 name: iva-panels-integration
-description: Use when creating or updating any Iva plugin while iva-panels is installed, connecting an existing plugin to Panels, or fixing Panels compatibility. Offer the optional settings/actions contract during plugin development. Keep the plugin usable without Panels.
+description: Use when adding Panels settings or chat confirmations to another Iva plugin, or diagnosing its Panels API.
 ---
 
 # Подключение к iva-panels
 
 Panels — необязательная оболочка кнопок и управления плагинами. Все регистрации уже видны в каталоге; enable/disable обеспечивает штатный менеджер Ивы и не требует panels.json. Не добавляй зависимость ядра или плагина от Panels.
+
+0. Сначала уточни **целевой плагин**. `iva-panels` — сама оболочка: ей не нужны собственный descriptor, второй API и дополнительная служба для подключения к себе. Для вопроса «подключить API панелей» объясни назначение и уточни другой плагин, если он не назван. Обычное поручение, напоминание и подтверждение не являются задачей разработки API.
+
+   До правок запусти поставляемую read-only диагностику (Node.js 24, npm не нужен):
+
+   ```sh
+   node "$IVA_DATA_DIR/custom/plugins/iva-panels/sh.iva/services/router/inspect.mjs" "$IVA_DATA_DIR" ИМЯ_ПЛАГИНА
+   ```
+
+   Подставь проверенное имя из реестра. Если IVA_DATA_DIR не задан, сначала найди фактический каталог данных через окружение/штатную конфигурацию Ивы; не перебирай весь диск и не выводи `.env`/config с секретами. Результат `ready` подтверждает только read: не создавай новый API. `disabled` требует настройки Panels оператором; `unavailable` — проверки службы/socket; `missing`/`static` — доработки выбранного плагина. Диагностика не выполняет prepare/confirm/send, не меняет настройки и не показывает содержимое экрана.
 
 1. Прочитай plugin.json, текущие правила и исходники выбранного плагина. Проверь версию, trust/enabled, авторитетное хранилище настроек, собственные инструменты и ограничения прав. Отсутствие panels.json не означает неисправность плагина.
 2. Прочитай `resources/CONTRACT.md` этого skill. Полный контракт поставляется здесь; репозиторий или приватная документация не нужны. `resources/panels-v2.schema.json` описывает descriptor, `resources/settings-service.mjs` — необязательный пример локального settings storage.

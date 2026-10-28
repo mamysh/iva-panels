@@ -27,7 +27,7 @@ npm run build
 npm run check
 ```
 
-В поставке сохраняются `server.mjs`, `lifecycle-worker.mjs`, `native-manager.mjs`.
+В поставке сохраняются `server.mjs`, `lifecycle-worker.mjs`, `native-manager.mjs`, `inspect.mjs`.
 Редактируйте исходники и пересобирайте; ручная правка bundle запрещена.
 CI проверяет сохранённые bundles без предварительной перезаписи.
 

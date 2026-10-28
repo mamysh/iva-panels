@@ -118,7 +118,7 @@ test("preview/cancel/private persistence never invoke manager; opt-in and protec
   assert(
     (await provider.page(cardId("demo"))).rows
       .flat()
-      .some((b) => b.label === "Управление плагином"),
+      .some((b) => b.label === "Включить / выключить"),
   );
   assert(
     (await installedPanels(f.data).page(`life:open:${f.key}`)).body.includes(

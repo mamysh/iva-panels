@@ -61,8 +61,8 @@ test("all installed plugins discovered; live addition/removal and pagination nev
   await writeFile(f.registry, JSON.stringify({ plugins: f.entries }));
   const home = await f.provider.page("home");
   assert.match(home.body, /Установлено: 15/);
-  assert.equal(home.rows.length, 7);
-  assert.equal(home.rows[0][0].id, cardId("demo"));
+  assert.equal(home.rows.length, 8);
+  assert.equal(home.rows[0][1].id, cardId("demo"));
   assert(home.rows.flat().some((b) => b.label.includes("выключен")));
   const second = await f.provider.page("catalog:1");
   assert(second.rows.flat().some((b) => b.id === "catalog:0"));

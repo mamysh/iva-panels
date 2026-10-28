@@ -7,3 +7,5 @@ plugin/sh.iva/services/router/server.mjs
 plugin/sh.iva/services/router/lifecycle-worker.mjs
 
 plugin/sh.iva/services/router/native-manager.mjs
+
+plugin/sh.iva/services/router/inspect.mjs

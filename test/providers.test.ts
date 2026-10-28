@@ -26,8 +26,8 @@ test("catalog includes unknown and untrusted plugins; built-in adapters remain g
   );
   const provider = installedPanels(data);
   const home = await provider.page("home");
-  assert.equal(home.rows.length, 4);
-  assert.equal(home.rows[0][0].id, cardId("bitrix24-read"));
+  assert.equal(home.rows.length, 5);
+  assert.equal(home.rows[0][1].id, cardId("bitrix24-read"));
   assert((await provider.page("bitrix24-read")).body.includes("не проверено"));
   assert((await provider.page("file-delivery")).body.includes("не разрешено"));
   await assert.rejects(provider.page("unknown"));

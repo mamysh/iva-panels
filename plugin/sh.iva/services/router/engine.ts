@@ -4,6 +4,7 @@ import {
   LIMITS,
   TTL,
   parseAction,
+  panelCommand,
   render,
   viewSchema,
   type Event,
@@ -168,11 +169,16 @@ export class Engine {
         return;
       }
     }
-    if (event.message.text === "/panels") {
+    const command = panelCommand(event.message.text);
+    if (command !== undefined) {
       if (Object.keys(state.screens).length >= LIMITS.screens)
         throw new Error("SCREEN_CAPACITY");
       const id = randomBytes(12).toString("hex");
-      const view = viewSchema.parse(await this.provider.page("home"));
+      const page =
+        command === ""
+          ? "home"
+          : `open:${createHash("sha256").update(command).digest("hex").slice(0, 24)}`;
+      const view = viewSchema.parse(await this.provider.page(page));
       const payload = render(view, id, 0);
       state.screens[id] = {
         owner: event.message.from.id,
@@ -180,7 +186,7 @@ export class Engine {
         message: null,
         revision: 0,
         expires: this.now() + TTL,
-        page: "home",
+        page,
         view,
         closed: false,
       };

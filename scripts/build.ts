@@ -1,6 +1,11 @@
 import { build } from "esbuild";
 import { readFile } from "node:fs/promises";
-for (const entry of ["server", "lifecycle-worker", "native-manager"]) {
+for (const entry of [
+  "server",
+  "lifecycle-worker",
+  "native-manager",
+  "inspect",
+]) {
   const output = `plugin/sh.iva/services/router/${entry}.mjs`;
   const result = await build({
     entryPoints: [`plugin/sh.iva/services/router/${entry}.ts`],

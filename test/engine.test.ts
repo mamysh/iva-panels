@@ -362,3 +362,22 @@ test("partial Bridge acknowledgement can shift a part index under the same batch
   await f.fresh().handle(event(100, "/panels", 11), 0);
   assert.equal(f.calls.filter((c) => c.kind === "send").length, 2);
 });
+
+test("explicit shortcut opens one bound screen and duplicate delivery never opens it again", async (t) => {
+  const f = await fixture(t);
+  const seen: string[] = [];
+  f.engine.provider.page = async (id) => {
+    seen.push(id);
+    return details;
+  };
+  const command = event(1, "/panels home");
+  await f.engine.handle(command);
+  await f.fresh().handle(command);
+  assert.equal(f.calls.length, 1);
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], /^open:[a-f0-9]{24}$/);
+  const screen = Object.values((await f.store.load()).screens)[0];
+  assert.equal(screen.page, seen[0]);
+  assert.equal(screen.owner, 42);
+  assert.equal(screen.message, 100);
+});
