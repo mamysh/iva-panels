@@ -5,6 +5,7 @@ for (const entry of [
   "lifecycle-worker",
   "native-manager",
   "inspect",
+  "install",
 ]) {
   const output = `plugin/sh.iva/services/router/${entry}.mjs`;
   const result = await build({

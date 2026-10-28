@@ -1,3 +1,5 @@
+import { setupWorker } from "./setup-system.ts";
+import { setupState } from "./setup.ts";
 import { serveChatCards } from "./chat-cards.ts";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -15,7 +17,16 @@ async function start() {
   const port = Number(process.env.IVA_SERVICE_PORT);
   if (!data || !ivaData || !Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("ENV_REQUIRED");
+  const plugin = process.env.PLUGIN_ROOT;
   const path = join(data, "config.json");
+  const missing = !(await stat(path).catch(() => undefined));
+  const pending = await setupState(data);
+  let prepared = false;
+  if (missing || pending) {
+    if (!plugin) throw new Error("ENV_REQUIRED");
+    prepared = (await setupWorker(plugin, ivaData, "internal-prepare"))
+      .prepared;
+  }
   const info = await stat(path);
   if (!info.isFile() || (info.mode & 0o077) !== 0 || info.size > 16384)
     throw new Error("PRIVATE_CONFIG_REQUIRED");
@@ -52,9 +63,11 @@ async function start() {
     console.error("iva-panels: listener failed");
     process.exitCode = 1;
   });
-  server.listen(port, "127.0.0.1", () =>
-    console.log(`iva-panels: listening on loopback (${config.mode})`),
-  );
+  await new Promise<void>((ready, fail) => {
+    server.once("error", fail);
+    server.listen(port, "127.0.0.1", ready);
+  });
+  console.log(`iva-panels: listening on loopback (${config.mode})`);
   for (const signal of ["SIGTERM", "SIGINT"] as const)
     process.on(signal, () => {
       cards?.close();
@@ -63,8 +76,36 @@ async function start() {
         server.closeAllConnections();
       }, 5000).unref();
     });
+  if (prepared && plugin) {
+    try {
+      const activated = await setupWorker(plugin, ivaData, "internal-activate");
+      if (activated.id) {
+        const result = await engine.issue(
+          activated.id,
+          "welcome",
+          config.owners[0],
+        );
+        await setupWorker(
+          plugin,
+          ivaData,
+          result.state === "presented"
+            ? "internal-notice-presented"
+            : "internal-notice-unknown",
+        );
+      }
+    } catch {
+      console.error(
+        "iva-panels: setup did not finish; inspect installer status before retrying",
+      );
+    }
+  }
 }
-start().catch(() => {
-  console.error("iva-panels: startup failed; check private config and data");
+start().catch((error) => {
+  const code = /^SETUP_[A-Z_]+$/.test(error?.message)
+    ? ` (${error.message})`
+    : "";
+  console.error(
+    `iva-panels: startup failed; check private config and data${code}`,
+  );
   process.exitCode = 1;
 });

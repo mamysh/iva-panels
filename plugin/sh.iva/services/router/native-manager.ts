@@ -189,6 +189,9 @@ export async function manage(
 }
 if (
   process.argv[1] &&
+  ["native-manager.mjs", "native-manager.ts"].includes(
+    basename(process.argv[1]),
+  ) &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const [cli, group, verb, name] = process.argv.slice(2);

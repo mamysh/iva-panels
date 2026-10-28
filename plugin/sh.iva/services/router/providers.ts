@@ -132,6 +132,15 @@ export function installedPanels(
           };
         return lifecycle.page(id);
       }
+      if (id === "welcome")
+        return {
+          title: "Panels готовы",
+          body: "Плагины и настройки теперь доступны здесь, в чате с Ивой. Нажмите «Открыть панели» или отправьте /panels. Для обычного поручения просто напишите Иве.",
+          rows: [
+            [{ id: "home", label: "Открыть панели" }],
+            [{ id: "close", label: "Закрыть" }],
+          ],
+        };
       if (id === "help")
         return {
           title: "Как пользоваться",
