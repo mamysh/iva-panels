@@ -24,7 +24,7 @@ for (const entry of [
   const text = result.outputFiles[0].contents;
   if (process.argv.includes("--check")) {
     if (!Buffer.from(text).equals(await readFile(output)))
-      throw new Error("Service bundle is stale");
+      throw new Error(`Service bundle is stale: ${output}`);
   } else {
     const { writeFile } = await import("node:fs/promises");
     await writeFile(output, text);

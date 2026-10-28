@@ -880,7 +880,8 @@ createInterface({input:process.stdin}).on('line', line => {
       await v2Tap("Bitrix24");
       await v2Tap("Данные сотрудников");
       assert(
-        rich.replaceAll("<b>", "").replaceAll("</b>", "").includes("разрешён"),
+        rich.includes("Скрыть email"),
+        "API reflects the confirmed policy after navigation and restart",
       );
       await v2Tap("Закрыть");
       await accept(message("ordinary after Bitrix v2"));
